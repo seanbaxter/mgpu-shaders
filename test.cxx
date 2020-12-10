@@ -1,5 +1,5 @@
-#include "kernel_merge.hxx"
+#include "search.hxx"
 
 int main() {
- // @spirv(&mgpu::kernel_merge<128, 7, float, void, std::less<float> >);
+  mgpu::merge_path_partitions<mgpu::bounds_lower, int>(0, 0, 0, 0);
 }

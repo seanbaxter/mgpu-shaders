@@ -6,6 +6,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+struct empty_t { };
+
 constexpr int div_up(int x, int y) {
   return (x + y - 1) / y;
 }
