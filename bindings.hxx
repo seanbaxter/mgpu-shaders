@@ -1,5 +1,6 @@
 #pragma once
 #include "meta.hxx"
+#include <vector>
 
 BEGIN_MGPU_NAMESPACE
 
@@ -19,9 +20,9 @@ template<auto index, typename type_t = @enum_type(index)>
 [[using spirv: buffer, binding(index)]]
 type_t shader_buffer;
 
+////////////////////////////////////////////////////////////////////////////////
 
 // Provide an a common iterator type.
-
 template<typename accessor_t, typename type_t = decltype(accessor_t::access(0))>
 struct iterator_t : std::iterator_traits<const std::remove_reference_t<type_t>*> {
 
@@ -51,11 +52,11 @@ struct iterator_t : std::iterator_traits<const std::remove_reference_t<type_t>*>
     return offset - rhs.offset;
   }
 
-  decltype(auto) operator*() noexcept {
+  decltype(auto) operator*() const noexcept {
     return accessor_t::access(offset);
   }
 
-  decltype(auto) operator[](int index) noexcept {
+  decltype(auto) operator[](int index) const noexcept {
     return accessor_t::access(offset + index);
   }
 
@@ -88,6 +89,48 @@ struct buffer_access_t {
 };
 template<typename type_t, int binding>
 using buffer_iterator_t = iterator_t<buffer_access_t<type_t, binding> >;
+
+struct empty_iterator_t : std::iterator_traits<const empty_t*> {
+  // Don't provide additional interface. The caller should check the 
+  // iterator_traits prior to subscripting.
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename type_t>
+struct gl_buffer_t {
+  gl_buffer_t(int count, const type_t* data = nullptr) noexcept {
+    glCreateBuffers(1, &buffer);
+    glNamedBufferStorage(buffer, sizeof(type_t) * count, data, 
+      GL_DYNAMIC_STORAGE_BIT);
+    count = count;
+  }
+  gl_buffer_t(const std::vector<type_t>& data) noexcept :
+    gl_buffer_t(data.size(), data.data()) { }
+
+  ~gl_buffer_t() {
+    glDeleteBuffers(1, &buffer);
+  }
+
+  gl_buffer_t(const gl_buffer_t&) = delete;
+  gl_buffer_t& operator=(const gl_buffer_t) = delete;
+
+  void set_data(const type_t* data) noexcept {
+    glNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+  }
+  void get_data(type_t* data) noexcept {
+    glGetNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+  }
+
+  std::vector<type_t> get_data() {
+    std::vector<type_t> vec(count);
+    get_data(vec.data());
+    return vec;
+  }
+
+  GLuint buffer;
+  int count;
+};
 
 END_MGPU_NAMESPACE
 

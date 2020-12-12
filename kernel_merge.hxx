@@ -1,6 +1,7 @@
 #pragma once
 #include "cta_merge.hxx"
 #include "transform.hxx"
+#include "kernel_partition.hxx"
 
 BEGIN_MGPU_NAMESPACE
 
@@ -9,13 +10,14 @@ BEGIN_MGPU_NAMESPACE
 
 template<
   int nt, int vt, 
+  typename mp_it,
   typename a_keys_it, typename a_vals_it,
   typename b_keys_it, typename b_vals_it,
   typename c_keys_it, typename c_vals_it,
   typename comp_t
 >
 void kernel_merge(
-  const int* mp_data,
+  mp_it mp_data,
   a_keys_it a_keys, a_vals_it a_vals, int a_count,
   b_keys_it b_keys, b_vals_it b_vals, int b_count,
   c_keys_it c_keys, c_vals_it c_vals, comp_t comp) {
@@ -26,13 +28,12 @@ void kernel_merge(
   const int nv = nt * vt;
   int tid = glcomp_LocalInvocationID.x;
   int cta = glcomp_WorkGroupID.x;
-
-  // TODO: Replace with [[spirv::alias]]
-  struct shared_t {
+ 
+  struct [[spirv::alias]] shared_t {
     type_t keys[nv + 1];
     int indices[nv];
   };
-  [[spirv::alias]] shared_t shared;
+  [[spirv::shared]] shared_t shared;
 
   // Load the range for this CTA and merge the values into register.
   int mp0 = mp_data[cta + 0];
@@ -41,7 +42,7 @@ void kernel_merge(
     mp0, mp1);
 
   merge_pair_t<type_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
-    a_keys, b_keys, range, tid, comp, shared.keys);
+     a_keys, b_keys, range, tid, comp, shared.keys);
 
   int dest_offset = nv * cta;
   reg_to_mem_thread<nt>(merge.keys, tid, range.total(), c_keys + dest_offset,
@@ -59,82 +60,62 @@ void kernel_merge(
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+template<int nt, int vt, typename params_t, int mp, int ubo>
+[[using spirv: comp, local_size(nt)]]
+void kernel_merge() {
+  params_t params = shader_uniform<ubo, params_t>;
 
-[[using spirv: buffer, readonly, binding(0)]]
-int mp_data_in[];
+  kernel_merge<nt, vt>(
+    readonly_iterator_t<int, mp>(),
+    
+    params.a_keys,
+    params.a_vals,
+    params.a_count,
 
-[[using spirv: buffer, writeonly, binding(0)]]
-int mp_data_out[];
+    params.b_keys,
+    params.b_vals,
+    params.b_count,
 
-template<typename type_t>
-[[using spirv: buffer, readonly, binding(1)]]
-type_t keysA_in[];
+    params.c_keys,
+    params.c_vals,
 
-template<typename type_t>
-[[using spirv: buffer, writeonly, binding(2)]]
-type_t keysB_in[];
+    params.comp
+  );
+}
 
-template<typename type_t>
-[[using spirv: buffer, writeonly, binding(3)]]
-type_t keysC_out[];
-
-template<typename type_t>
-[[using spirv: buffer, readonly, binding(4)]]
-type_t valuesA_in[];
-
-template<typename type_t>
-[[using spirv: buffer, readonly, binding(5)]]
-type_t valuesB_in[];
-
-template<typename type_t>
-[[using spirv: buffer, writeonly, binding(6)]]
-type_t valuesC_out[];
-
-template<typename comp_t>
+template<
+  typename a_keys_it,
+  typename a_values_it,
+  typename b_keys_it,
+  typename b_values_it,
+  typename c_keys_it,
+  typename c_values_it,
+  typename comp_t>
 struct merge_params_t {
-  int a_count, b_count;
-  int spacing; // NV * VT
+  a_keys_it a_keys;
+  b_keys_it b_keys;
+  c_keys_it c_keys;
+
+  int a_count;
+  int b_count;
+  int spacing;           // NV * VT
+
+  // Put the potentially empty objects together to take up less space.
+  a_values_it a_vals;
+  b_values_it b_vals;
+  c_values_it c_vals;
   comp_t comp;
 };
 
-template<typename comp_t>
-[[using spirv: uniform, binding(0)]]
-merge_params_t<comp_t> merge_params;
+template<int nt, int vt, typename params_t, int mp, int ubo = 0>
+void launch_merge(int count) {
+  // First launch the partition kernel.
+  launch_partition<bounds_lower, params_t, mp, ubo>(count, nt * vt);
 
-template<int nt, int vt, typename type_t, typename comp_t>
-[[using spirv: comp, local_size(nt)]]
-void kernel_merge() {
-  kernel_merge(
-    mp_data_in,
-    keysA_in<type_t>,
-    (const empty_t*)nullptr,
-    merge_params<comp_t>.a_count,
-    keysB_in<type_t>,
-    (const empty_t*)nullptr,
-    merge_params<comp_t>.b_count,
-    keysC_out<type_t>,
-    (empty_t*)nullptr,
-    merge_params<comp_t>.comp
-  );
+  // Launch the CTA merge kernel.
+  int num_ctas = div_up(count, nt * vt);
+  gl_dispatch_kernel<kernel_merge<nt, vt, params_t, mp, ubo> >(num_ctas);
 }
 
-
-template<int nt, int vt, typename type_t, typename val_t, typename comp_t>
-[[using spirv: comp, local_size(nt)]]
-void kernel_merge_kv() {
-  kernel_merge(
-    mp_data_in,
-    keysA_in<type_t>,
-    valuesA_in<val_t>,
-    merge_params<comp_t>.a_count,
-    keysB_in<type_t>,
-    valuesB_in<val_t>,
-    merge_params<comp_t>.b_count,
-    keysC_out<type_t>,
-    valuesC_out<val_t>,
-    merge_params<comp_t>.comp
-  );
-}
 
 END_MGPU_NAMESPACE

@@ -17,7 +17,7 @@ void kernel_partition(mp_it mp_data, a_it a, int a_count, b_it b, int b_count,
   }
 }
 
-template<bounds_t bounds, typename params_t, int ubo>
+template<bounds_t bounds, typename params_t, int mp, int ubo>
 [[using spirv: comp, local_size(128)]]
 void kernel_partition() {
   // Load the kernel parameters from the uniform buffer at binding=ubo.
@@ -25,41 +25,24 @@ void kernel_partition() {
 
   // Launch the kernel using kernel parameters.
   kernel_partition<bounds>(
-    params.mp_data,
-    params.a,
+    writeonly_iterator_t<int, mp>(),
+    params.a_keys,
     params.a_count,
-    params.b,
+    params.b_keys,
     params.b_count,
     params.spacing,
     params.comp
   );
 }
 
-template<
-  typename a_it, 
-  typename b_it, 
-  typename mp_it, 
-  typename comp_t = std::less<decltype(std::declval<a_it>()[0])>
->
-struct merge_path_partitions_t {
-  a_it a;
-  b_it b;
-  mp_it mp_data;
-  comp_t comp;
+int num_merge_partitions(int count, int spacing) {
+  return div_up(count, spacing) + 1;
+}
 
-  int a_count;
-  int b_count;
-  int spacing;
-
-  template<bounds_t bounds, int ubo = 0>
-  void launch() {
-    int num_partitions = (int)div_up(a_count + b_count, spacing) + 1;
-    int num_ctas = div_up(num_partitions, 128);
-
-    gl_dispatch_kernel<kernel_partition<bounds, merge_path_partitions_t, ubo> >(
-      num_ctas
-    );
-  }
-};
+template<bounds_t bounds, typename params_t, int mp, int ubo = 0>
+void launch_partition(int count, int spacing) {
+  int num_ctas = div_up(num_merge_partitions(count, spacing), 128);
+  gl_dispatch_kernel<kernel_partition<bounds, params_t, mp, ubo> >(num_ctas);
+}
 
 END_MGPU_NAMESPACE

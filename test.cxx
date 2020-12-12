@@ -1,28 +1,43 @@
-#include "search.hxx"
+#include "kernel_merge.hxx"
+#include <vector>
 
 using namespace mgpu;
 
-struct search_params_t {
-  readonly_iterator_t<float, 0> a;
-  readonly_iterator_t<float, 1> b;
-  writeonly_iterator_t<int, 2> mp_data;
-  std::less<float> comp;
+template<typename type_t>
+std::vector<type_t> gpu_merge(std::vector<type_t>& a, 
+  std::vector<type_t>& b) {
 
-  int a_count;
-  int b_count;
-  int spacing;
-};
+  gl_buffer_t<type_t> a_keys(a);
+  gl_buffer_t<type_t> b_keys(b);
+  gl_buffer_t<type_t> c_keys(a.size() + b.size());
 
-int main() {
-  merge_path_partitions_t<
-    readonly_iterator_t<float, 0>,
-    readonly_iterator_t<float, 1>,
-    writeonly_iterator_t<int, 2>
+  merge_params_t<
+    readonly_iterator_t<type_t, 0>,
+    empty_iterator_t,
+
+    readonly_iterator_t<type_t, 1>,
+    empty_iterator_t,
+
+    writeonly_iterator_t<type_t, 2>,
+    empty_iterator_t,
+
+    // Use default comparison.
+    std::less<int>
   > params;
 
-  params.a_count = 100;
-  params.b_count = 200;
-  params.spacing = 128 * 7;
+  params.a_count = a.size();
+  params.b_count = b.size();
 
-  params.launch<bounds_lower>();
+  const int nt = 128;
+  const int vt = 7;
+  params.spacing = nt * vt;
+
+  launch_merge<nt, vt, decltype(params), 3>(a.size() + b.size());
+
+  return c_keys.get_data();
+}
+
+int main() {
+  std::vector<float> a(100), b(100);
+  std::vector<float> c = gpu_merge(a, b);
 }
