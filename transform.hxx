@@ -1,9 +1,9 @@
 #pragma once
 #include <gl3w/GL/gl3w.h>
 
-struct shader_t {
-  GLuint shader;
-};
+#include "bindings.hxx"
+
+BEGIN_MGPU_NAMESPACE
 
 template<auto kernel>
 void gl_dispatch_kernel(int x, int y = 1, int z = 1) {
@@ -23,3 +23,4 @@ void gl_dispatch_kernel(int x, int y = 1, int z = 1) {
   glDispatchCompute(x, y, z);
 }
 
+END_MGPU_NAMESPACE

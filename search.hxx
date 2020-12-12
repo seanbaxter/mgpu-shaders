@@ -4,8 +4,9 @@
 
 BEGIN_MGPU_NAMESPACE
 
-template<bounds_t bounds, typename a_it, typename b_it, typename comp_t>
-void kernel_partition(int* mp_data, a_it a, int a_count, b_it b, int b_count, 
+template<bounds_t bounds, typename mp_it, typename a_it, typename b_it, 
+  typename comp_t>
+void kernel_partition(mp_it mp_data, a_it a, int a_count, b_it b, int b_count, 
   int spacing, comp_t comp) {
 
   int num_partitions = (int)div_up(a_count + b_count, spacing) + 1;
@@ -16,28 +17,30 @@ void kernel_partition(int* mp_data, a_it a, int a_count, b_it b, int b_count,
   }
 }
 
-template<bounds_t bounds, typename type_t, typename comp_t = std::less<type_t>>
+template<bounds_t bounds, typename params_t, int ubo>
 [[using spirv: comp, local_size(128)]]
 void kernel_partition() {
+  // Load the kernel parameters from the uniform buffer at binding=ubo.
+  params_t params = shader_uniform<ubo, params_t>;
+
+  // Launch the kernel using kernel parameters.
   kernel_partition<bounds>(
-    mp_data_out, 
-    keysA_in<type_t>,
-    merge_params<comp_t>.a_count,
-    keysB_in<type_t>,
-    merge_params<comp_t>.b_count,
-    merge_params<comp_t>.spacing,
-    merge_params<comp_t>.comp
+    params.mp_data,
+    params.a,
+    params.a_count,
+    params.b,
+    params.b_count,
+    params.spacing,
+    params.comp
   );
 }
 
-template<bounds_t bounds, typename type_t, typename comp_t = std::less<type_t>>
-void merge_path_partitions(GLuint mp_data, int a_count, int b_count, 
-  int spacing) {
-
+template<bounds_t bounds, typename params_t, int ubo = 0>
+void merge_path_partitions(int a_count, int b_count, int spacing) {
   int num_partitions = (int)div_up(a_count + b_count, spacing) + 1;
   int num_ctas = div_up(num_partitions, 128);
 
-  gl_dispatch_kernel<kernel_partition<bounds, type_t, comp_t>>(num_ctas);
+  gl_dispatch_kernel<kernel_partition<bounds, params_t, ubo> >(num_ctas);
 }
 
 END_MGPU_NAMESPACE
