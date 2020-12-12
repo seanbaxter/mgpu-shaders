@@ -35,12 +35,31 @@ void kernel_partition() {
   );
 }
 
-template<bounds_t bounds, typename params_t, int ubo = 0>
-void merge_path_partitions(int a_count, int b_count, int spacing) {
-  int num_partitions = (int)div_up(a_count + b_count, spacing) + 1;
-  int num_ctas = div_up(num_partitions, 128);
+template<
+  typename a_it, 
+  typename b_it, 
+  typename mp_it, 
+  typename comp_t = std::less<decltype(std::declval<a_it>()[0])>
+>
+struct merge_path_partitions_t {
+  a_it a;
+  b_it b;
+  mp_it mp_data;
+  comp_t comp;
 
-  gl_dispatch_kernel<kernel_partition<bounds, params_t, ubo> >(num_ctas);
-}
+  int a_count;
+  int b_count;
+  int spacing;
+
+  template<bounds_t bounds, int ubo = 0>
+  void launch() {
+    int num_partitions = (int)div_up(a_count + b_count, spacing) + 1;
+    int num_ctas = div_up(num_partitions, 128);
+
+    gl_dispatch_kernel<kernel_partition<bounds, merge_path_partitions_t, ubo> >(
+      num_ctas
+    );
+  }
+};
 
 END_MGPU_NAMESPACE

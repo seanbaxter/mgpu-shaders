@@ -14,16 +14,15 @@ struct search_params_t {
 };
 
 int main() {
-  search_params_t params;
+  merge_path_partitions_t<
+    readonly_iterator_t<float, 0>,
+    readonly_iterator_t<float, 1>,
+    writeonly_iterator_t<int, 2>
+  > params;
+
   params.a_count = 100;
   params.b_count = 200;
   params.spacing = 128 * 7;
 
-  // Specify the type of the search parameters and the UBO binding at which
-  // to find them.
-  mgpu::merge_path_partitions<mgpu::bounds_lower, search_params_t, 0>(
-    params.a_count,
-    params.b_count,
-    params.spacing
-  );
+  params.launch<bounds_lower>();
 }
