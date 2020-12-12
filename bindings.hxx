@@ -99,11 +99,10 @@ struct empty_iterator_t : std::iterator_traits<const empty_t*> {
 
 template<typename type_t>
 struct gl_buffer_t {
-  gl_buffer_t(int count, const type_t* data = nullptr) noexcept {
+  gl_buffer_t(int count, const type_t* data = nullptr) noexcept : count(count) {
     glCreateBuffers(1, &buffer);
     glNamedBufferStorage(buffer, sizeof(type_t) * count, data, 
       GL_DYNAMIC_STORAGE_BIT);
-    count = count;
   }
   gl_buffer_t(const std::vector<type_t>& data) noexcept :
     gl_buffer_t(data.size(), data.data()) { }

@@ -114,7 +114,7 @@ void launch_merge(int count) {
 
   // Launch the CTA merge kernel.
   int num_ctas = div_up(count, nt * vt);
-  gl_dispatch_kernel<kernel_merge<nt, vt, params_t, mp, ubo> >(num_ctas);
+  // gl_dispatch_kernel<kernel_merge<nt, vt, params_t, mp, ubo> >(num_ctas);
 }
 
 

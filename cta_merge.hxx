@@ -128,7 +128,7 @@ merge_pair_t<type_t, vt> serial_merge(const type_t* keys_shared,
     else b_key = c_key, range.b_begin = index;
   }}
 
-  // if(sync) __syncthreads();
+  if(sync) __syncthreads();
   return merge_pair;
 }
 
