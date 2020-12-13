@@ -29,7 +29,7 @@ void kernel_merge(
   int tid = glcomp_LocalInvocationID.x;
   int cta = glcomp_WorkGroupID.x;
  
-  struct [[spirv::alias]] shared_t {
+  union [[spirv::alias]] shared_t {
     type_t keys[nv + 1];
     int indices[nv];
   };
