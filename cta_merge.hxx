@@ -157,6 +157,7 @@ merge_pair_t<type_t, vt> cta_merge_from_mem(a_it a, b_it b,
   // only vt elements will be merged.
   merge_pair_t<type_t, vt> merged = serial_merge<bounds, vt>(keys_shared,
     range_local.partition(mp, diag), comp);
+  merged.mp = mp;
 
   return merged;
 };

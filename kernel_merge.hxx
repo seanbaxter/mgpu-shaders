@@ -26,14 +26,16 @@ void kernel_merge(
   typedef typename std::iterator_traits<a_vals_it>::value_type val_t;
 
   const int nv = nt * vt;
-  int tid = threadIdx.x;
-  int cta = blockIdx.x;
+  int tid = glcomp_LocalInvocationID.x;// threadIdx.x;
+  int cta = glcomp_WorkGroupID.x;// blockIdx.x;
  
-  union [[spirv::alias]] shared_t {
-    type_t keys[nv + 1];
-    int indices[nv];
-  };
-  [[spirv::shared]] shared_t shared;
+  // struct [[spirv::alias]] shared_t {
+  //   type_t keys[nv + 1];
+  //   int indices[nv];
+  // };
+  // [[spirv::shared]] shared_t shared;
+  [[spirv::shared]] type_t keys[nv + 1];
+  // [[spirv::shared]] int indices[nv];
 
   // Load the range for this CTA and merge the values into register.
   int mp0 = mp_data[cta + 0];
@@ -42,22 +44,22 @@ void kernel_merge(
     mp0, mp1);
 
   merge_pair_t<type_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
-     a_keys, b_keys, range, tid, comp, shared.keys);
+     a_keys, b_keys, range, tid, comp, keys);
 
   int dest_offset = nv * cta;
   reg_to_mem_thread<nt>(merge.keys, tid, range.total(), c_keys + dest_offset,
-    shared.keys);
+    keys);
   
-  if constexpr(!std::is_same_v<empty_t, val_t>) {
-    // Transpose the indices from thread order to strided order.
-    std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices, tid, 
-      shared.indices);
-
-    // Gather the input values and merge into the output values.
-    transfer_two_streams_strided<nt>(a_vals + range.a_begin, range.a_count(),
-      b_vals + range.b_begin, range.b_count(), indices, tid, 
-      c_vals + dest_offset);
-  }
+  // if constexpr(!std::is_same_v<empty_t, val_t>) {
+  //   // Transpose the indices from thread order to strided order.
+  //   std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices, tid, 
+  //     shared.indices);
+  // 
+  //   // Gather the input values and merge into the output values.
+  //   transfer_two_streams_strided<nt>(a_vals + range.a_begin, range.a_count(),
+  //     b_vals + range.b_begin, range.b_count(), indices, tid, 
+  //     c_vals + dest_offset);
+  // }
 }
 
 template<int nt, int vt, typename params_t, int mp, int ubo>
@@ -96,9 +98,9 @@ struct merge_params_t {
   b_keys_it b_keys;
   c_keys_it c_keys;
 
+  int spacing;           // NV * VT
   int a_count;
   int b_count;
-  int spacing;           // NV * VT
 
   // Put the potentially empty objects together to take up less space.
   a_values_it a_vals;
@@ -114,7 +116,7 @@ void launch_merge(int count) {
 
   // Launch the CTA merge kernel.
   int num_ctas = div_up(count, nt * vt);
-  // gl_dispatch_kernel<kernel_merge<nt, vt, params_t, mp, ubo> >(num_ctas);
+  gl_dispatch_kernel<kernel_merge<nt, vt, params_t, mp, ubo> >(num_ctas);
 }
 
 

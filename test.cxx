@@ -8,7 +8,8 @@
 using namespace mgpu;
 
 template<typename type_t>
-std::vector<int> gpu_merge(std::vector<type_t>& a, std::vector<type_t>& b) {
+std::vector<int> gpu_merge_partition(const std::vector<type_t>& a, 
+  const std::vector<type_t>& b) {
 
   merge_params_t<
     readonly_iterator_t<type_t, 0>,
@@ -33,10 +34,10 @@ std::vector<int> gpu_merge(std::vector<type_t>& a, std::vector<type_t>& b) {
   int count = params.a_count + params.b_count;
   int num_partitions = num_merge_partitions(count, params.spacing);
 
-  gl_buffer_t<type_t> a_keys(a);
-  gl_buffer_t<type_t> b_keys(b);
-  gl_buffer_t<int>    mp(num_partitions);
-  gl_buffer_t<type_t> c_keys(count);
+  gl_buffer_t<type_t>           a_keys(a);
+  gl_buffer_t<type_t>           b_keys(b);
+  gl_buffer_t<int>              mp(num_partitions);
+  gl_buffer_t<type_t>           c_keys(count);
   gl_buffer_t<decltype(params)> ubo(1, &params);
   
   // Select the SSBOs.
@@ -51,6 +52,50 @@ std::vector<int> gpu_merge(std::vector<type_t>& a, std::vector<type_t>& b) {
     params.a_count + params.b_count, params.spacing);
 
   return mp.get_data();
+}
+
+template<int nt, int vt, typename type_t>
+std::vector<type_t> gpu_merge(const std::vector<type_t>& a, 
+  const std::vector<type_t>& b) {
+
+  merge_params_t<
+    readonly_iterator_t<type_t, 0>,
+    empty_iterator_t,
+
+    readonly_iterator_t<type_t, 1>,
+    empty_iterator_t,
+
+    writeonly_iterator_t<type_t, 2>,
+    empty_iterator_t,
+
+    // Use default comparison.
+    std::less<int>
+  > params;
+
+  params.spacing = nt * vt;
+  params.a_count = a.size();
+  params.b_count = b.size();
+
+  int count = params.a_count + params.b_count;
+  int num_partitions = num_merge_partitions(count, params.spacing);
+
+  gl_buffer_t<type_t>           a_keys(a);
+  gl_buffer_t<type_t>           b_keys(b);
+  gl_buffer_t<type_t>           c_keys(count);
+  gl_buffer_t<int>              mp(num_partitions);
+  gl_buffer_t<decltype(params)> ubo(1, &params);
+  
+  // Select the SSBOs.
+  a_keys.bind_ssbo(0);
+  b_keys.bind_ssbo(1);
+  c_keys.bind_ssbo(2);
+  mp    .bind_ssbo(3);
+  ubo   .bind_ubo(0);
+
+  // Select the parameters.
+  launch_merge<nt, vt, decltype(params), 3, 0>(count);
+
+  return c_keys.get_data();
 }
 
 struct app_t {
@@ -123,12 +168,12 @@ int main() {
   std::vector<float> a(a_count), b(b_count);
   
   for(int i = 0; i < a_count; ++i)
-    a[i] = 2 * i + 0;
+    a[i] = 4 * i + a_count / 3;
   for(int i = 0; i < b_count; ++i)
-    b[i] = 2 * i + 1;
+    b[i] = 5 * i + 1;
 
-  std::vector<int> c = gpu_merge(a, b);
+  std::vector<float> c = gpu_merge<128, 7>(a, b);
 
   for(int i = 0; i < c.size(); ++i)
-    printf("%d: %d\n", i, c[i]);
+    printf("%d: %f\n", i, c[i]);
 }

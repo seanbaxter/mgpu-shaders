@@ -59,6 +59,7 @@ struct alignas(16) merge_range_t {
 
 template<typename type_t, int size>
 struct merge_pair_t {
+  int mp;
   std::array<type_t, size> keys;
   std::array<int, size> indices;
 };
