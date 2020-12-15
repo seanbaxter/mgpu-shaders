@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <type_traits>
 
 #define BEGIN_MGPU_NAMESPACE namespace mgpu {
 #define END_MGPU_NAMESPACE }
@@ -16,6 +17,22 @@ constexpr int64_t div_up(int64_t x, int64_t y) {
 }
 constexpr size_t div_up(size_t x, size_t y) {
   return (x + y - 1) / y;
+}
+
+template<typename type_t>
+constexpr bool is_pow2(type_t x) {
+  static_assert(std::is_integral_v<type_t>);
+  return 0 == (x & (x - 1));
+}
+
+constexpr int s_log2(int x) {
+  int i = 0;
+  while(x) {
+    x>>= 1;
+    ++i;
+  }
+
+  return i;
 }
 
 template<int count, typename func_t>

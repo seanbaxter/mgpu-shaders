@@ -22,19 +22,19 @@ void kernel_merge(
   b_keys_it b_keys, b_vals_it b_vals, int b_count,
   c_keys_it c_keys, c_vals_it c_vals, comp_t comp) {
 
-  typedef typename std::iterator_traits<a_keys_it>::value_type type_t;
+  typedef typename std::iterator_traits<a_keys_it>::value_type key_t;
   typedef typename std::iterator_traits<a_vals_it>::value_type val_t;
 
   const int nv = nt * vt;
-  int tid = glcomp_LocalInvocationID.x;// threadIdx.x;
-  int cta = glcomp_WorkGroupID.x;// blockIdx.x;
+  int tid = threadIdx.x;
+  int cta = blockIdx.x;
  
   // struct [[spirv::alias]] shared_t {
   //   type_t keys[nv + 1];
   //   int indices[nv];
   // };
   // [[spirv::shared]] shared_t shared;
-  [[spirv::shared]] type_t keys[nv + 1];
+  [[spirv::shared]] key_t keys[nv + 1];
   // [[spirv::shared]] int indices[nv];
 
   // Load the range for this CTA and merge the values into register.
@@ -43,7 +43,7 @@ void kernel_merge(
   merge_range_t range = compute_merge_range(a_count, b_count, cta, nv, 
     mp0, mp1);
 
-  merge_pair_t<type_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
+  merge_pair_t<key_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
      a_keys, b_keys, range, tid, comp, keys);
 
   int dest_offset = nv * cta;

@@ -1,4 +1,6 @@
 #include "kernel_merge.hxx"
+#include "kernel_mergesort.hxx"
+
 #include <cstdio>
 
 #define GL_GLEXT_PROTOTYPES

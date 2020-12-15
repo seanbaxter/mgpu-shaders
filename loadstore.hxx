@@ -1,6 +1,5 @@
 // moderngpu copyright (c) 2016, Sean Baxter http://www.moderngpu.com
 #pragma once
-
 #include "types.hxx"
 
 BEGIN_MGPU_NAMESPACE
