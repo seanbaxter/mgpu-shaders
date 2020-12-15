@@ -121,6 +121,13 @@ struct gl_buffer_t {
     glGetNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
   }
 
+  void bind_ubo(GLuint index) {
+    glBindBufferBase(GL_UNIFORM_BUFFER, index, buffer);
+  }
+  void bind_ssbo(GLuint index) {
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, buffer);
+  }
+
   std::vector<type_t> get_data() {
     std::vector<type_t> vec(count);
     get_data(vec.data());

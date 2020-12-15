@@ -26,8 +26,8 @@ void kernel_merge(
   typedef typename std::iterator_traits<a_vals_it>::value_type val_t;
 
   const int nv = nt * vt;
-  int tid = glcomp_LocalInvocationID.x;
-  int cta = glcomp_WorkGroupID.x;
+  int tid = threadIdx.x;
+  int cta = blockIdx.x;
  
   union [[spirv::alias]] shared_t {
     type_t keys[nv + 1];

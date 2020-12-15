@@ -8,12 +8,7 @@
 using namespace mgpu;
 
 template<typename type_t>
-std::vector<type_t> gpu_merge(std::vector<type_t>& a, 
-  std::vector<type_t>& b) {
-
-  gl_buffer_t<type_t> a_keys(a);
-  gl_buffer_t<type_t> b_keys(b);
-  gl_buffer_t<type_t> c_keys(a.size() + b.size());
+std::vector<int> gpu_merge(std::vector<type_t>& a, std::vector<type_t>& b) {
 
   merge_params_t<
     readonly_iterator_t<type_t, 0>,
@@ -29,16 +24,33 @@ std::vector<type_t> gpu_merge(std::vector<type_t>& a,
     std::less<int>
   > params;
 
-  params.a_count = a.size();
-  params.b_count = b.size();
-
   const int nt = 128;
   const int vt = 7;
   params.spacing = nt * vt;
+  params.a_count = a.size();
+  params.b_count = b.size();
 
-  launch_merge<nt, vt, decltype(params), 3>(a.size() + b.size());
+  int count = params.a_count + params.b_count;
+  int num_partitions = num_merge_partitions(count, params.spacing);
 
-  return c_keys.get_data();
+  gl_buffer_t<type_t> a_keys(a);
+  gl_buffer_t<type_t> b_keys(b);
+  gl_buffer_t<int>    mp(num_partitions);
+  gl_buffer_t<type_t> c_keys(count);
+  gl_buffer_t<decltype(params)> ubo(1, &params);
+  
+  // Select the SSBOs.
+  a_keys.bind_ssbo(0);
+  b_keys.bind_ssbo(1);
+  c_keys.bind_ssbo(2);
+  mp    .bind_ssbo(3);
+  ubo   .bind_ubo(0);
+
+  // Select the parameters.
+  launch_partition<bounds_lower, decltype(params), 3, 0>(
+    params.a_count + params.b_count, params.spacing);
+
+  return mp.get_data();
 }
 
 struct app_t {
@@ -106,11 +118,17 @@ int main() {
   gl3wInit();
   app_t app;
 
-  std::vector<float> a(100), b(100);
-  for(int i = 0; i < 100; ++i)
-    a[i] = 2 * i, b[i] = 2 * i + 1;
+  int a_count = 10000;
+  int b_count = 10000;
+  std::vector<float> a(a_count), b(b_count);
+  
+  for(int i = 0; i < a_count; ++i)
+    a[i] = 2 * i + 0;
+  for(int i = 0; i < b_count; ++i)
+    b[i] = 2 * i + 1;
 
-  std::vector<float> c = gpu_merge(a, b);
+  std::vector<int> c = gpu_merge(a, b);
 
-  printf("%f\n", c[:])...;
+  for(int i = 0; i < c.size(); ++i)
+    printf("%d: %d\n", i, c[i]);
 }
