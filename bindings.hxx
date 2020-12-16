@@ -1,6 +1,7 @@
 #pragma once
 #include "meta.hxx"
 #include <vector>
+#include <optional>
 
 BEGIN_MGPU_NAMESPACE
 
@@ -217,7 +218,9 @@ template<typename T>
 struct gl_buffer_t<T, false, true> {
   typedef std::remove_const_t<T> type_t;
 
-  gl_buffer_t(const type_t& x = type_t()) : data(x) {
+  gl_buffer_t() : buffer(0), invalid(true) { }
+
+  gl_buffer_t(const type_t& x) : data(x) {
     glCreateBuffers(1, &buffer);
     glNamedBufferStorage(buffer, sizeof(type_t), &data, 
       GL_DYNAMIC_STORAGE_BIT);
@@ -229,15 +232,16 @@ struct gl_buffer_t<T, false, true> {
   }
   
   void set_data(const type_t& x) noexcept {
-    if(memcmp(&x, &data, sizeof(type_t))) {
-      memcpy(&data, &x, sizeof(type_t));
+    if(!data || memcmp(&x, &data, sizeof(type_t))) {
+      data.emplace(x);
       invalid = true;
     }
   }
 
   void update() {
     if(invalid) {
-      glNamedBufferSubData(buffer, 0, sizeof(type_t), &data);
+      assert(data);
+      glNamedBufferSubData(buffer, 0, sizeof(type_t), &*data);
       invalid = false;
     }
   }
@@ -254,7 +258,7 @@ struct gl_buffer_t<T, false, true> {
 
   GLuint buffer;
   bool invalid;
-  type_t data;
+  std::optional<type_t> data;
 };
 
 
