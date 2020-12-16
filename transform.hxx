@@ -36,15 +36,16 @@ void kernel_transform() {
 
 template<int ubo = 0, int nt = 128, typename func_t>
 void gl_transform(func_t func, int count) {
+  static_assert(std::is_copy_constructible_v<func_t>);
+  
   struct data_t {
     func_t func;
     int count;
   };
-  static_assert(std::is_copy_constructible_v<func_t>);
 
   // Keep a cache for the UBO. Only calls glNamedBufferSubData if 
   // its contents are different from the last bind operation.
-  static gl_buffer_t<const data_t> buffer( { func, count });
+  static gl_buffer_t<const data_t> buffer;
   buffer.set_data({ func, count });
   buffer.bind_ubo(ubo);
 

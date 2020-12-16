@@ -7,19 +7,19 @@ BEGIN_MGPU_NAMESPACE
 
 template<auto index, typename type_t = @enum_type(index)>
 [[using spirv: uniform, binding((int)index)]]
-extern type_t shader_uniform;
+type_t shader_uniform;
 
 template<auto index, typename type_t = @enum_type(index)>
 [[using spirv: buffer, readonly, binding(index)]]
-extern type_t shader_readonly;
+type_t shader_readonly;
 
 template<auto index, typename type_t = @enum_type(index)>
 [[using spirv: buffer, writeonly, binding(index)]]
-extern type_t shader_writeonly;
+type_t shader_writeonly;
 
 template<auto index, typename type_t = @enum_type(index)>
 [[using spirv: buffer, binding(index)]]
-extern type_t shader_buffer;
+type_t shader_buffer;
 
 ////////////////////////////////////////////////////////////////////////////////
 
