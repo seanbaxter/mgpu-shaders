@@ -120,7 +120,8 @@ void launch_merge(int count) {
 // merge_pipeline_t is a convenient entry point for using the merge 
 // kernel. It loads data from SSBOs and writes to an SSBO. Storage for 
 // the parameters UBO and merge paths SSBO is handled automatically.
-template<typename key_t, typename val_t, typename comp_t = std::less<key_t> >
+template<typename key_t, typename val_t = empty_t, 
+  typename comp_t = std::less<key_t> >
 struct merge_pipeline_t {
   void reserve(int count, int spacing) {
     int num_partitions = num_merge_partitions(count, spacing);
@@ -128,9 +129,11 @@ struct merge_pipeline_t {
       partitions_ssbo.resize(num_partitions);
   }
 
-  template<int nt, int vt>
+  template<int nt = 128, int vt = 7>
   void launch(GLuint a_keys, int a_count, GLuint b_keys, int b_count, 
     GLuint c_keys, comp_t comp = comp_t()) {
+
+    static_assert(std::is_same_v<empty_t, val_t>);
 
     // Bind the merge path SSBO.
     reserve(a_count + b_count, nt * vt);
@@ -150,6 +153,38 @@ struct merge_pipeline_t {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, a_keys);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, b_keys);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, c_keys);
+
+    launch_merge<nt, vt, params_t, 3, 0>(a_count + b_count);
+  }
+
+  template<int nt = 256, int vt = 7>
+  void launch(GLuint a_keys, GLuint a_vals, int a_count, GLuint b_keys,
+    GLuint b_vals, int b_count, GLuint c_keys, GLuint c_vals, 
+    comp_t comp = comp_t()) {
+
+    static_assert(!std::is_same_v<empty_t, val_t>);
+
+    // Bind the merge path SSBO.
+    reserve(a_count + b_count, nt * vt);
+    partitions_ssbo.bind_ssbo(3);
+
+    params_t params { };
+    params.spacing = nt * vt;
+    params.a_count = a_count;
+    params.b_count = b_count;
+    params.comp = comp;
+
+    // Upload and bind the UBO.
+    params_ubo.set_data(params);
+    params_ubo.bind_ubo(0);
+
+    // Bind the data.
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, a_keys);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, b_keys);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, c_keys);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, a_vals);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, b_vals);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, c_vals);
 
     launch_merge<nt, vt, params_t, 3, 0>(a_count + b_count);
   }

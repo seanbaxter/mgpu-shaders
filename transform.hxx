@@ -1,6 +1,5 @@
 #pragma once
 #include <gl3w/GL/gl3w.h>
-
 #include "bindings.hxx"
 
 BEGIN_MGPU_NAMESPACE
@@ -23,6 +22,34 @@ void gl_dispatch_kernel(int x, int y = 1, int z = 1) {
     glUseProgram(program);
     glDispatchCompute(x, y, z); 
   }
+}
+
+template<int ubo, int nt, typename data_t>
+[[using spirv: comp, local_size(nt)]]
+void kernel_transform() {
+  data_t data = shader_uniform<ubo, data_t>;
+
+  int gid = threadIdx.x + nt * blockIdx.x;
+  if(gid < data.count)
+    data.func(gid);
+}
+
+template<int ubo = 0, int nt = 128, typename func_t>
+void gl_transform(func_t func, int count) {
+  struct data_t {
+    func_t func;
+    int count;
+  };
+  static_assert(std::is_copy_constructible_v<func_t>);
+
+  // Keep a cache for the UBO. Only calls glNamedBufferSubData if 
+  // its contents are different from the last bind operation.
+  static gl_buffer_t<const data_t> buffer( { func, count });
+  buffer.set_data({ func, count });
+  buffer.bind_ubo(ubo);
+
+  int num_ctas = div_up(count, nt);
+  gl_dispatch_kernel<kernel_transform<ubo, nt, data_t> >(num_ctas);
 }
 
 END_MGPU_NAMESPACE

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cassert>
+#include <cstring>
 #include <type_traits>
 
 #define BEGIN_MGPU_NAMESPACE namespace mgpu {

@@ -3,7 +3,9 @@
 
 BEGIN_MGPU_NAMESPACE
 
+////////////////////////////////////////////////////////////////////////////////
 // Sort full tiles in place.
+
 template<
   int nt, int vt,
   typename keys_in_it, typename vals_in_it,
@@ -64,7 +66,58 @@ void kernel_blocksort() {
   );
 }
 
+template<
+  typename keys_in_it, typename vals_in_it,
+  typename keys_out_it, typename vals_out_it,
+  typename comp_t
+>
+struct blocksort_params_t {
+  int count;
+  comp_t comp;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
+
+template<typename mp_it, typename keys_it, typename comp_t>
+void kernel_mergesort_partition(mp_it mp_data, keys_it keys, int count, 
+  int spacing, int coop, comp_t comp) {
+
+  int tid = threadIdx.x;
+  int gid = blockIdx.x;
+
+  int num_partitions = div_up(count, spacing) + 1;
+}
+
+template<typename params_t, uint mp, typename keys_in_it, typename comp_t>
+[[using spirv: comp, local_size(128)]
+void kernel_mergesort_partition() {
+  params_t params = shader_uniform<ubo, params_t>;
+  kernel_mergesort_partition(
+    writeonly_iterator_t<int, mp>(),
+    params.keys_in,
+    params.a_count,
+    params.spacing,
+    params.num_partitions,
+    params.coop,
+    params.comp
+  );
+}
+/*
+template<typename keys_it, typename comp_t>
+mem_t<int> merge_sort_partitions(keys_it keys, int count, int coop, 
+  int spacing, comp_t comp, context_t& context) {
+
+  int num_partitions = div_up(count, spacing) + 1;
+  auto k = [=]MGPU_DEVICE(int index) {
+    merge_range_t range = compute_mergesort_range(count, index, coop, spacing);
+    int diag = min(spacing * index, count) - range.a_begin;
+    return merge_path<bounds_lower>(keys + range.a_begin, range.a_count(), 
+      keys + range.b_begin, range.b_count(), diag, comp);
+  };
+}
+*/
+////////////////////////////////////////////////////////////////////////////////
+// Join two fully sorted sequences into one sequence.
 
 template<
   int nt, int vt,
@@ -137,14 +190,54 @@ template<
   typename keys_out_it,
   typename vals_out_it,
   typename comp_t
-> struct mergesort_params_t {
+> struct mergesort_pass_params_t {
   keys_in_it keys_in;
   vals_in_it vals_in;
   keys_out_it keys_out;
 
+
+  int spacing;  // For partitioning
+  int count;
+  int coop;     // 2<< pass.
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename key_t, typename val_t = empty_t, 
+  typename comp_t = std::less<key_t>, int max_passes = 14>
+struct mergesort_params_t {
+  // Reserve bind slot 2 for merge path array.
+
+  blocksort_params_t<
+    readonly_iterator_t<key_t, 0>,
+    readonly_iterator_t<key_t, 3>,
+    writeonly_iterator_t<key_t, 1>,
+    writeonly_iterator_t<key_t, 4>,
+    comp_t,
+  > blocksort;
+
+  // Alternate 
+  mergesort_pass_params_t<
+
+
+  > passes[max_passes];
+ 
   int count;
   int coop; // 2<< pass.
 };
+
+
+
+template<
+  typename keys_in_it, typename vals_in_it,
+  typename keys_out_it, typename vals_out_it,
+  typename comp_t
+>
+struct blocksort_params_t {
+  int count;
+  comp_t comp;
+};
+
 
 
 

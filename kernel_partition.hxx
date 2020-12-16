@@ -4,6 +4,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+// Basic partitioning used for merge and load balancing search.
+// Mergesort and segmented sort have their own partitioning kernels.
 template<bounds_t bounds, typename mp_it, typename a_it, typename b_it, 
   typename comp_t>
 void kernel_partition(mp_it mp_data, a_it a, int a_count, b_it b, int b_count, 
