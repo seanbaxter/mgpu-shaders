@@ -9,93 +9,17 @@
 
 using namespace mgpu;
 
-template<typename type_t>
-std::vector<int> gpu_merge_partition(const std::vector<type_t>& a, 
-  const std::vector<type_t>& b) {
-
-  merge_params_t<
-    readonly_iterator_t<type_t, 0>,
-    empty_iterator_t,
-
-    readonly_iterator_t<type_t, 1>,
-    empty_iterator_t,
-
-    writeonly_iterator_t<type_t, 2>,
-    empty_iterator_t,
-
-    // Use default comparison.
-    std::less<int>
-  > params;
-
-  const int nt = 128;
-  const int vt = 7;
-  params.spacing = nt * vt;
-  params.a_count = a.size();
-  params.b_count = b.size();
-
-  int count = params.a_count + params.b_count;
-  int num_partitions = num_merge_partitions(count, params.spacing);
-
-  gl_buffer_t<type_t>           a_keys(a);
-  gl_buffer_t<type_t>           b_keys(b);
-  gl_buffer_t<int>              mp(num_partitions);
-  gl_buffer_t<type_t>           c_keys(count);
-  gl_buffer_t<decltype(params)> ubo(1, &params);
-  
-  // Select the SSBOs.
-  a_keys.bind_ssbo(0);
-  b_keys.bind_ssbo(1);
-  c_keys.bind_ssbo(2);
-  mp    .bind_ssbo(3);
-  ubo   .bind_ubo(0);
-
-  // Select the parameters.
-  launch_partition<bounds_lower, decltype(params), 3, 0>(
-    params.a_count + params.b_count, params.spacing);
-
-  return mp.get_data();
-}
 
 template<int nt, int vt, typename type_t>
 std::vector<type_t> gpu_merge(const std::vector<type_t>& a, 
   const std::vector<type_t>& b) {
 
-  merge_params_t<
-    readonly_iterator_t<type_t, 0>,
-    empty_iterator_t,
+  gl_buffer_t<type_t[]> a_keys(a);
+  gl_buffer_t<type_t[]> b_keys(b);
+  gl_buffer_t<type_t[]> c_keys(a.size() + b.size());
 
-    readonly_iterator_t<type_t, 1>,
-    empty_iterator_t,
-
-    writeonly_iterator_t<type_t, 2>,
-    empty_iterator_t,
-
-    // Use default comparison.
-    std::less<int>
-  > params;
-
-  params.spacing = nt * vt;
-  params.a_count = a.size();
-  params.b_count = b.size();
-
-  int count = params.a_count + params.b_count;
-  int num_partitions = num_merge_partitions(count, params.spacing);
-
-  gl_buffer_t<type_t>           a_keys(a);
-  gl_buffer_t<type_t>           b_keys(b);
-  gl_buffer_t<type_t>           c_keys(count);
-  gl_buffer_t<int>              mp(num_partitions);
-  gl_buffer_t<decltype(params)> ubo(1, &params);
-  
-  // Select the SSBOs.
-  a_keys.bind_ssbo(0);
-  b_keys.bind_ssbo(1);
-  c_keys.bind_ssbo(2);
-  mp    .bind_ssbo(3);
-  ubo   .bind_ubo(0);
-
-  // Select the parameters.
-  launch_merge<nt, vt, decltype(params), 3, 0>(count);
+  merge_pipeline_t<type_t, empty_t> pipeline;
+  pipeline.template launch<nt, vt>(a_keys, a.size(), b_keys, b.size(), c_keys);
 
   return c_keys.get_data();
 }
@@ -128,18 +52,14 @@ app_t::app_t() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
-  int width = 320;
-  int height = 200;
-  window = glfwCreateWindow(width, height, "sort test", nullptr, nullptr);
+  glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+  window = glfwCreateWindow(320, 240, "sort test", nullptr, nullptr);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 
   glEnable(GL_DEBUG_OUTPUT);
   glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
   glDebugMessageCallback(_debug_callback, this);
-
-  glfwGetWindowSize(window, &width, &height);
-  glViewport(0, 0, width, height);
 }
 
 void app_t::debug_callback(GLenum source, GLenum type, GLuint id, 

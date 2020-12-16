@@ -19,8 +19,10 @@ void gl_dispatch_kernel(int x, int y = 1, int z = 1) {
     glLinkProgram(program);
   }
 
-  glUseProgram(program);
-  glDispatchCompute(x, y, z);
+  if(x && y && z) {
+    glUseProgram(program);
+    glDispatchCompute(x, y, z); 
+  }
 }
 
 END_MGPU_NAMESPACE

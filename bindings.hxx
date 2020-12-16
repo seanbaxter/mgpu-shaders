@@ -69,6 +69,7 @@ struct readonly_access_t {
     return shader_readonly<binding, type_t[]>[index];
   }
 };
+
 template<typename type_t, int binding>
 using readonly_iterator_t = iterator_t<readonly_access_t<type_t, binding> >;
 
@@ -97,8 +98,12 @@ struct empty_iterator_t : std::iterator_traits<const empty_t*> {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template<typename type_t>
+template<typename T, bool is_array = std::is_array_v<T> >
 struct gl_buffer_t {
+  typedef std::remove_extent_t<T> type_t;
+
+  gl_buffer_t() : buffer(0), count(0) { }
+
   gl_buffer_t(int count, const type_t* data = nullptr) noexcept : count(count) {
     glCreateBuffers(1, &buffer);
     glNamedBufferStorage(buffer, sizeof(type_t) * count, data, 
@@ -108,17 +113,26 @@ struct gl_buffer_t {
     gl_buffer_t(data.size(), data.data()) { }
 
   ~gl_buffer_t() {
-    glDeleteBuffers(1, &buffer);
+    if(buffer)
+      glDeleteBuffers(1, &buffer);
   }
 
   gl_buffer_t(const gl_buffer_t&) = delete;
   gl_buffer_t& operator=(const gl_buffer_t) = delete;
 
+  operator GLuint() noexcept { return buffer; }
+
   void set_data(const type_t* data) noexcept {
-    glNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+    if(count) {
+      assert(buffer);
+      glNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+    }
   }
   void get_data(type_t* data) noexcept {
-    glGetNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+    if(count) {
+      assert(buffer);
+      glGetNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+    }
   }
 
   void bind_ubo(GLuint index) {
@@ -134,9 +148,57 @@ struct gl_buffer_t {
     return vec;
   }
 
+  void resize(int count2) {
+    gl_buffer_t buffer2(count2);
+    std::swap(buffer, buffer2.buffer);
+    std::swap(count, buffer2.count);
+  }
+
   GLuint buffer;
   int count;
 };
+
+template<typename type_t>
+struct gl_buffer_t<type_t, false> {
+  gl_buffer_t(const type_t* data = nullptr) noexcept {
+    glCreateBuffers(1, &buffer);
+    glNamedBufferStorage(buffer, sizeof(type_t), data, 
+      GL_DYNAMIC_STORAGE_BIT);
+  }
+
+  ~gl_buffer_t() {
+    glDeleteBuffers(1, &buffer);
+  }
+
+  gl_buffer_t(const gl_buffer_t&) = delete;
+  gl_buffer_t& operator=(const gl_buffer_t) = delete;
+
+  operator GLuint() noexcept { return buffer; }
+
+  void set_data(const type_t& data) noexcept {
+    assert(buffer);
+    glNamedBufferSubData(buffer, 0, sizeof(type_t), &data);
+  }
+  void get_data(type_t* data) noexcept {
+    assert(buffer);
+    glGetNamedBufferSubData(buffer, 0, sizeof(type_t), data);
+  }
+  type_t get_data() noexcept {
+    type_t x;
+    get_data(&x);
+    return x;
+  }
+
+  void bind_ubo(GLuint index) {
+    glBindBufferBase(GL_UNIFORM_BUFFER, index, buffer);
+  }
+  void bind_ssbo(GLuint index) {
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, buffer);
+  }
+
+  GLuint buffer;
+};
+
 
 END_MGPU_NAMESPACE
 
