@@ -218,7 +218,11 @@ template<typename T>
 struct gl_buffer_t<T, false, true> {
   typedef std::remove_const_t<T> type_t;
 
-  gl_buffer_t() : buffer(0), invalid(true) { }
+  gl_buffer_t() : buffer(0), invalid(true) {
+    glCreateBuffers(1, &buffer);
+    glNamedBufferStorage(buffer, sizeof(type_t), nullptr, 
+      GL_DYNAMIC_STORAGE_BIT);
+  }
 
   gl_buffer_t(const type_t& x) : data(x) {
     glCreateBuffers(1, &buffer);
