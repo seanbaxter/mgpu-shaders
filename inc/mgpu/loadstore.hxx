@@ -14,9 +14,13 @@ void reg_to_shared_thread(std::array<type_t, vt> x, int tid,
   static_assert(shared_size >= nt * vt,
     "reg_to_shared_thread must have at least nt * vt storage");
 
-  thread_iterate<vt>([&](int i, int j) { 
-    shared[j] = x[i]; 
-  }, tid);
+  // thread_iterate<vt>([&](int i, int j) { 
+  //   shared[j] = x[i]; 
+  // }, tid);
+
+  @meta for(int i = 0; i < vt; ++i)
+    shared[vt * tid + i] = x[i];
+
   if(sync) __syncthreads();
 }
 
@@ -42,7 +46,11 @@ void reg_to_shared_strided(std::array<type_t, vt> x, int tid,
   static_assert(shared_size >= nt * vt,
     "reg_to_shared_strided must have at least nt * vt storage");
 
-  strided_iterate<nt, vt>([&](int i, int j) { shared[j] = x[i]; }, tid);
+  // strided_iterate<nt, vt>([&](int i, int j) { shared[j] = x[i]; }, tid);
+
+  @meta for(int i = 0; i < vt; ++i)
+    shared[nt * i + tid] = x[i];
+
   if(sync) __syncthreads();
 }
 

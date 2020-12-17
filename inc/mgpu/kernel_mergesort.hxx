@@ -41,31 +41,31 @@ void kernel_blocksort(
   kv_array_t<key_t, val_t, vt> unsorted;
   unsorted.keys = mem_to_reg_thread<nt, vt>(keys_in + tile.begin, tid, 
     tile.count(), shared.keys);
-//
- // if constexpr(sort_indices) {
- //   // If we're sorting key/index pairs, sythesize the data without sampling
- //   // the counting_iterator, which would perform a trip through shared 
- //   // memory.
- //   int index = nv * cta + vt * tid;
- //   @meta for(int i = 0; i < vt; ++i)
- //     unsorted.vals[i] = index + i;
-//
- // } else if constexpr(has_values) {
- //   unsorted.vals = mem_to_reg_thread<nt, vt>(vals_in + tile.begin, tid,
- //     tile.count(), shared.vals);
- // }
 
- //// Blocksort.
- //kv_array_t<key_t, val_t, vt> sorted = sort_t().block_sort(unsorted,
- //  tid, tile.count(), comp, shared);
+  if constexpr(sort_indices) {
+    // If we're sorting key/index pairs, sythesize the data without sampling
+    // the counting_iterator, which would perform a trip through shared 
+    // memory.
+    int index = nv * cta + vt * tid;
+    @meta for(int i = 0; i < vt; ++i)
+      unsorted.vals[i] = index + i;
 
- //// Store the keys and values.
- //reg_to_mem_thread<nt, vt>(sorted.keys, tid, tile.count(), 
- //  keys_out + tile.begin, shared.keys);
+  } else if constexpr(has_values) {
+    unsorted.vals = mem_to_reg_thread<nt, vt>(vals_in + tile.begin, tid,
+      tile.count(), shared.vals);
+  }
 
- //if constexpr(has_values)
- //  reg_to_mem_thread<nt, vt>(sorted.vals, tid, tile.count(), 
- //    vals_out + tile.begin, shared.vals);
+  // Blocksort.
+  kv_array_t<key_t, val_t, vt> sorted = sort_t().block_sort(unsorted,
+    tid, tile.count(), comp, shared);
+
+  // Store the keys and values.
+  reg_to_mem_thread<nt, vt>(sorted.keys, tid, tile.count(), 
+    keys_out + tile.begin, shared.keys);
+
+  if constexpr(has_values)
+    reg_to_mem_thread<nt, vt>(sorted.vals, tid, tile.count(), 
+      vals_out + tile.begin, shared.vals);
 }
 
 template<bool sort_indices, int nt, int vt, typename params_t, int ubo>
@@ -86,7 +86,7 @@ void kernel_blocksort() {
   // and mergesort pass kernels use these terms to know which pass they're
   // working on.
   int first_thread = !(threadIdx.x | blockIdx.x);
-  if(params.pass_offset && first_thread)
+  if(params.pass_offset & first_thread)
     params.mp_data[params.pass_offset] = 0;
 }
 
@@ -167,16 +167,16 @@ void kernel_mergesort_pass(mp_it mp_data,
 
   merge_pair_t<key_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
     keys_in, keys_in, range, tid, comp, shared.keys);
-
-  // Store merged values back out.
+//
+  //// Store merged values back out.
   reg_to_mem_thread<nt>(merge.keys, tid, tile.count(), 
     keys_out + tile.begin, shared.keys);
-
-  if(has_values) {
+//
+  if constexpr(has_values) {
     // Transpose the indices from thread order to strided order.
     std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices,
       tid, shared.indices);
-
+//
     // Gather the input values and merge into the output values.
     transfer_two_streams_strided<nt>(vals_in + range.a_begin, 
       range.a_count(), vals_in + range.b_begin, range.b_count(),
@@ -187,7 +187,9 @@ void kernel_mergesort_pass(mp_it mp_data,
 template<int nt, int vt, typename params_t, int mp, int ubo>
 [[using spirv: comp, local_size(nt)]]
 void kernel_mergesort_pass() {
-  const params_t& params = shader_uniform<ubo, params_t>;
+  // THIS LINE BREAKS! FIX!
+  // const params_t& params = shader_uniform<ubo, params_t>;
+  params_t params = shader_uniform<ubo, params_t>;
 
   // Load the pass.
   int pass = params.mp_data[params.pass_offset + 1];
@@ -319,22 +321,18 @@ struct mergesort_pipeline_t {
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys2);
 
-   //  // Launch the partitions kernel.
-   //  gl_dispatch_kernel<kernel_mergesort_partition<params_t, 2> >(
-   //   info.num_partition_ctas);
+      // Launch the partitions kernel.
+      gl_dispatch_kernel<kernel_mergesort_partition<params_t, 2> >(
+        info.num_partition_ctas);
 
       auto vec = partitions_ssbo.get_data();
       printf("%d: %d\n", @range(), vec[:])...;
 
-  //  // Launch the mergesort pass kernel.
-  //  gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 2, 0> >(
-  //    info.num_ctas
-  //  );
- 
+      // Launch the mergesort pass kernel.
+      gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 2, 0> >(
+        info.num_ctas
+      );
 
-      vec = partitions_ssbo.get_data();
-      printf("%d: %d\n", @range(), vec[:])...;
-      
       std::swap(keys, keys2);
     }
     
