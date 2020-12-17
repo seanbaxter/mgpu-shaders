@@ -34,6 +34,11 @@ struct gl_buffer_t {
 
   operator GLuint() noexcept { return buffer; }
 
+  void swap(gl_buffer_t& rhs) noexcept {
+    std::swap(buffer, rhs.buffer);
+    std::swap(count, rhs.count);
+  }
+
   void set_data(const type_t* data) noexcept {
     if(count) {
       assert(buffer);
