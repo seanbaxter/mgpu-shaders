@@ -314,7 +314,7 @@ struct mergesort_pipeline_t {
     gl_dispatch_kernel<kernel_blocksort<false, nt, vt, params_t, 0> >(
       info.num_ctas
     );
-      glFinish();
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     
     // Execute the merge passes.
     for(int pass = 0; pass < info.num_passes; ++pass) {
@@ -325,24 +325,12 @@ struct mergesort_pipeline_t {
       // Launch the partitions kernel.
       gl_dispatch_kernel<kernel_mergesort_partition<params_t> >(
         info.num_partition_ctas);
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-      glFinish();
-
-     // auto vec = partitions_ssbo.get_data();
-     // printf("%d: %d\n", @range(), vec[:])...;
-//
-      // Launch the mergesort pass kernel.
-    // if(1 == pass) {
-    //   glCopyNamedBufferSubData(keys, keys2, 0, 0, count * sizeof(key_t));
-    //   return;
-    // } else {
-//
-        gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 0> >(
-          info.num_ctas
-        ); 
-     // }
-
-      glFinish();
+      gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 0> >(
+        info.num_ctas
+      );
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
       std::swap(keys, keys2);
     }

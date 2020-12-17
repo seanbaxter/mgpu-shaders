@@ -18,8 +18,8 @@ void gpu_sort(std::vector<type_t>& data) {
 int main() {
   app_t app("sort demo");
 
-  const int nt = 128;
-  const int vt = 7;
+  const int nt = 256;
+  const int vt = 11;
   int count = nt * vt * 512;
   std::vector<float> data(count);
   for(int i = 0; i < count; ++i)
