@@ -1,11 +1,12 @@
-#include "bindings.hxx"
+#include <mgpu/kernel_mergesort.hxx>
+#include <mgpu/app.hxx>
 
-using namespace mgpu;
+using mgpu::gl_buffer_t;
 
 // TODO: Only put simulation params here.
 
 // simulation parameters
-struct sim_params_t {
+struct SimParams {
   vec3  colliderPos;
   float colliderRadius;
 
@@ -13,7 +14,7 @@ struct sim_params_t {
   float globalDamping;
   float particleRadius;
 
-  uint3 gridSize;
+  ivec3 gridSize;
   uint  numCells;
   vec3  worldOrigin;
   vec3  cellSize;
@@ -29,21 +30,21 @@ struct sim_params_t {
 };
 
 inline vec3 collide_spheres(vec3 posA, vec3 posB, vec3 velA, vec3 velB,
-  float radiusA, float radiusB, const params_t& params) {
+  float radiusA, float radiusB, const SimParams& params) {
 
-  vec3 rel_pos = pos_b - pos_a;
-  float dist = length(rel_pos);
-  float collideDist = radius_a + radius_b;
+  vec3 relPos = posB - posA;
+  float dist = length(relPos);
+  float collideDist = radiusA + radiusB;
 
   vec3 force { };
-  if(dist < collid_dist) {
-    vec3 norm = rel_pos / dist;
+  if(dist < collideDist) {
+    vec3 norm = relPos / dist;
 
     // relative velocity.
     vec3 relVel = velB - velA;
 
     // relative tangential velocity.
-    vec3 tan_vel = relVel - dot(relVel, relVel) * norm;
+    vec3 tanVel = relVel - dot(relVel, relVel) * norm;
 
     // spring force.
     force = -params.spring * (collideDist - dist);
@@ -61,8 +62,8 @@ inline vec3 collide_spheres(vec3 posA, vec3 posB, vec3 velA, vec3 velB,
   return force;
 }
 
-inline int3 calcGridPos(vec3 pos, const params_t& params) {
-  int3 grid_pos = (int3)floor((p - params.worldOrigin) / params.cellSize);
+inline ivec3 calcGridPos(vec3 p, const SimParams& params) {
+  ivec3 grid_pos = (ivec3)floor((p - params.worldOrigin) / params.cellSize);
   grid_pos &= params.gridSize - 1;
   return grid_pos;
 }
@@ -75,13 +76,17 @@ struct system_t {
   gl_buffer_t<vec4[]> velocities_out;
 
   // Hash each particle to a cell ID.
-  gl_buffer_t<uint> cell_hash;
+  gl_buffer_t<int> cell_hash;
 
   // After sorting the particles, these are the offsets into the particle
   // array for each cell.
-  gl_buffer_t<uint> cell_offsets;
+  gl_buffer_t<int> cell_offsets;
 
-  params_t params;
+  gl_buffer_t<int> gather_indices;
+
+  mgpu::mergesort_pipeline_t<int, int> sort_pipeline;
+
+  SimParams params;
   int num_particles;
 
   void collide();
@@ -90,22 +95,17 @@ struct system_t {
 };
 
 void system_t::collide() {
-  auto pos_in = positions.bind_ssbo<0>;
-  auto vel_out = velocities.bind_ssbo<1>;
+  auto pos_in = positions.bind_ssbo<0>();
+  auto vel_in = velocities.bind_ssbo<1>();
 
-  auto pos_out = positions.bind_ssbo<2>;
-  auto vel_out = velocities.bind_ssbo<3>;
+  auto pos_out = positions.bind_ssbo<2>();
+  auto vel_out = velocities.bind_ssbo<3>();
 
   gl_transform([=, params](int index) {
     vec3 pos = pos_data[index].xyz;
     vec3 vel = vel_data[index].xyz;
 
     int3 gridPos = calcGridPos(pos, sim_params_ubo);
-
-    
-
-
-
 
   }, num_particles);
 }
@@ -173,7 +173,12 @@ void system_t::sort_particles() {
   // Sort particles by their hash bin. The value of the sort is the 
   // index of the parameter. This lets us gather the positions and velocities
   // after the hash sort is complete.
+  gather_indices.resize(num_particles);
+  sort_pipeline.sort_keys_indices(hash_data, );
 
 
+}
 
+int main() {
+  mgpu::app_t app("particles");
 }

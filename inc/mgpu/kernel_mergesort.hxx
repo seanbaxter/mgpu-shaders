@@ -271,7 +271,7 @@ struct mergesort_pipeline_t {
     return { num_passes, num_ctas, num_partitions, num_partition_ctas };
   }
 
-  template<int nt = 256, int vt = 7>
+  template<int nt = 128, int vt = 7>
   void sort_keys(GLuint keys, int count, comp_t comp = comp_t()) {
     static_assert(!has_values);
     const int nv = nt * vt;
@@ -314,7 +314,6 @@ struct mergesort_pipeline_t {
     gl_dispatch_kernel<kernel_blocksort<false, nt, vt, params_t, 0> >(
       info.num_ctas
     );
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     
     // Execute the merge passes.
     for(int pass = 0; pass < info.num_passes; ++pass) {
@@ -325,30 +324,101 @@ struct mergesort_pipeline_t {
       // Launch the partitions kernel.
       gl_dispatch_kernel<kernel_mergesort_partition<params_t> >(
         info.num_partition_ctas);
-      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
+      // Launch the mergesort pass kernel.
       gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 0> >(
         info.num_ctas
       );
-      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
+      // Swap the source and destintation buffers.
       std::swap(keys, keys2);
     }
   }
 
-  template<int nt = 256, int vt = 7>
-  void sort_key_indices(GLuint keys, GLuint indices, int count, 
+  template<int nt = 128, int vt = 7>
+  void sort_keys_indices(GLuint keys, GLuint vals, int count, 
     comp_t comp = comp_t()) {
-    static_assert(std::is_same_v<int, val_t>);
-    if(!count) return;
-
+    
+    sort_keys_values<nt, vt, true>(keys, vals, count, comp);
   }
 
-  template<int nt = 256, int vt = 7>
-  void sort_key_values(GLuint keys, GLuint values, int count,
+  template<int nt = 256, int vt = 7, bool sort_indices = false>
+  void sort_keys_values(GLuint keys, GLuint vals, int count,
     comp_t comp = comp_t()) {
+
     static_assert(has_values);
+    const int nv = nt * vt;
+
     if(!count) return;
+
+    params_t params { };
+    info_t info = reserve(count, nv);
+
+    params.count = count;
+    params.spacing = nv;
+    params.num_partitions = info.num_partitions;
+    params.comp = comp;
+
+    // Ping pong with this buffer.
+    GLuint keys2 = keys_ssbo.buffer;
+    GLuint vals2 = vals_ssbo.buffer;
+    
+    // Upload the UBO.
+    params_ubo.set_data(params);
+    params_ubo.bind_ubo(0);
+
+    // Bind the partitions buffer.
+    if(info.num_passes)
+      partitions_ssbo.bind_ssbo(2);
+
+    // Execute the block sort.
+    if(info.num_passes % 2) {
+      // Read the input and write to the aux buffer.
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys2);
+
+      if constexpr(!sort_indices)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, vals);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vals2);
+
+      std::swap(keys, keys2);
+
+    } else {
+      // Read the input and write to the input.
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys);
+
+      if constexpr(!sort_indices)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, vals);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vals);
+    }
+
+    // Launch the blocksort kernel.
+    gl_dispatch_kernel<kernel_blocksort<sort_indices, nt, vt, params_t, 0> >(
+      info.num_ctas
+    );
+
+    // Execute the merge passes.
+    for(int pass = 0; pass < info.num_passes; ++pass) {
+      // Bind the inputs and outputs.
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys2);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, vals);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vals2);
+
+      // Launch the partitions kernel.
+      gl_dispatch_kernel<kernel_mergesort_partition<params_t> >(
+        info.num_partition_ctas);
+
+      // Launch the mergesort pass kernel.
+      gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 0> >(
+        info.num_ctas
+      );
+
+      // Swap the source and destintation buffers.
+      std::swap(keys, keys2);
+      std::swap(vals, vals2);
+    }
   }
 
   typedef mergesort_params_t<

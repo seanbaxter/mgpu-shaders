@@ -5,7 +5,7 @@
 BEGIN_MGPU_NAMESPACE
 
 template<auto kernel>
-void gl_dispatch_kernel(int x, int y = 1, int z = 1) {
+void gl_dispatch_kernel(int x, bool membar = true) {
   static GLuint program = 0;
   if(!program) {
     GLuint cs = glCreateShader(GL_COMPUTE_SHADER);
@@ -18,9 +18,12 @@ void gl_dispatch_kernel(int x, int y = 1, int z = 1) {
     glLinkProgram(program);
   }
 
-  if(x && y && z) {
+  if(x) {
     glUseProgram(program);
-    glDispatchCompute(x, y, z); 
+    glDispatchCompute(x, 1, 1); 
+
+    if(membar)
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
   }
 }
 
@@ -35,7 +38,7 @@ void kernel_transform() {
 }
 
 template<int ubo = 0, int nt = 128, typename func_t>
-void gl_transform(func_t func, int count) {
+void gl_transform(func_t func, int count, bool membar = true) {
   static_assert(std::is_copy_constructible_v<func_t>);
   
   struct data_t {
@@ -50,7 +53,7 @@ void gl_transform(func_t func, int count) {
   buffer.bind_ubo(ubo);
 
   int num_ctas = div_up(count, nt);
-  gl_dispatch_kernel<kernel_transform<ubo, nt, data_t> >(num_ctas);
+  gl_dispatch_kernel<kernel_transform<ubo, nt, data_t> >(num_ctas, membar);
 }
 
 END_MGPU_NAMESPACE
