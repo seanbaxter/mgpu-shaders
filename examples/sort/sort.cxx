@@ -20,11 +20,21 @@ int main() {
 
   const int nt = 128;
   const int vt = 1;
-  int count = nt * vt * 1;
+  int count = nt * vt * 4;
   std::vector<float> data(count);
   for(int i = 0; i < count; ++i)
     data[i] = rand() % 1000;
 
   gpu_sort<nt, vt>(data);
   printf("%d: %f\n", @range(), data[:])...;
+
+  bool is_sorted = (... && (data[:] <= data[1:]));
+  printf("IS SORTED = %d\n", is_sorted);
+
+  for(int i = 0; i < data.size() - 1; ++i) {
+    if(data[i] > data[i + 1]) {
+      printf("ERROR AT i = %d\n", i);
+      exit(0);
+    }
+  }
 }

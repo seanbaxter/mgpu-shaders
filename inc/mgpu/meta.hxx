@@ -27,6 +27,13 @@ constexpr bool is_pow2(type_t x) {
   return 0 == (x & (x - 1));
 }
 
+// Find log2(x) and optionally round up to the next integer logarithm.
+int find_log2(int x, bool round_up = false) {
+  int a = 31 - __builtin_clz(x);
+  if(round_up) a += !is_pow2(x);
+  return a;
+} 
+
 constexpr int s_log2(int x) {
   int i = 0;
   while(x) {
