@@ -85,18 +85,16 @@ void kernel_blocksort() {
   // Zero out the pass identifiers at the end of the mp data. The partition
   // and mergesort pass kernels use these terms to know which pass they're
   // working on.
-  int first_thread = !(threadIdx.x | blockIdx.x);
-  if(params.pass_offset & first_thread)
-    params.mp_data[params.pass_offset] = 0;
+  //if(params.num_partitions + threadIdx.x + blockIdx.x)
+    params.mp_data[params.num_partitions] = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename mp_it, typename keys_it, typename comp_t>
 void kernel_mergesort_partition(mp_it mp_data, keys_it keys, int count, 
-  int spacing, int coop, comp_t comp) {
+  int num_partitions, int spacing, int coop, comp_t comp) {
 
-  int num_partitions = (int)div_up(count, spacing) + 1;
   int index = threadIdx.x + blockDim.x * blockIdx.x;
   if(index < num_partitions) {
     merge_range_t range = compute_mergesort_range(count, index, coop, spacing);
@@ -106,24 +104,25 @@ void kernel_mergesort_partition(mp_it mp_data, keys_it keys, int count,
   }
 }
 
-template<typename params_t, int mp, int ubo = 0>
+template<typename params_t, int ubo = 0>
 [[using spirv: comp, local_size(128)]]
 void kernel_mergesort_partition() {
   params_t params = shader_uniform<ubo, params_t>;
 
   // Load the pass.
-  int pass = params.mp_data[params.pass_offset];
+  int pass = params.mp_data[params.num_partitions];
 
   // The first thread should increment the pass.
-  int first_thread = !(threadIdx.x | blockIdx.x);
+  int first_thread = !threadIdx.x && !blockIdx.x;
   if(first_thread)
-    params.mp_data[params.pass_offset + 1] = pass;
+    params.mp_data[params.num_partitions + 1] = pass;
 
   int coop = 2<< pass;
   kernel_mergesort_partition(
-    writeonly_iterator_t<int, mp>(),
+    params.mp_data,
     params.keys_in,
     params.count,
+    params.num_partitions,
     params.spacing,
     coop,
     params.comp
@@ -140,7 +139,8 @@ template<
   typename keys_out_it, typename vals_out_it,
   typename comp_t
 >
-void kernel_mergesort_pass(mp_it mp_data,
+void kernel_mergesort_pass(
+  mp_it mp_data,
   keys_in_it keys_in, vals_in_it vals_in,
   keys_out_it keys_out, vals_out_it vals_out, 
   int count, int coop, comp_t comp) {
@@ -167,16 +167,16 @@ void kernel_mergesort_pass(mp_it mp_data,
 
   merge_pair_t<key_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
     keys_in, keys_in, range, tid, comp, shared.keys);
-//
-  //// Store merged values back out.
+
+  // Store merged values back out.
   reg_to_mem_thread<nt>(merge.keys, tid, tile.count(), 
     keys_out + tile.begin, shared.keys);
-//
+
   if constexpr(has_values) {
     // Transpose the indices from thread order to strided order.
     std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices,
       tid, shared.indices);
-//
+
     // Gather the input values and merge into the output values.
     transfer_two_streams_strided<nt>(vals_in + range.a_begin, 
       range.a_count(), vals_in + range.b_begin, range.b_count(),
@@ -184,7 +184,7 @@ void kernel_mergesort_pass(mp_it mp_data,
   }
 }
 
-template<int nt, int vt, typename params_t, int mp, int ubo>
+template<int nt, int vt, typename params_t, int ubo>
 [[using spirv: comp, local_size(nt)]]
 void kernel_mergesort_pass() {
   // THIS LINE BREAKS! FIX!
@@ -192,16 +192,16 @@ void kernel_mergesort_pass() {
   params_t params = shader_uniform<ubo, params_t>;
 
   // Load the pass.
-  int pass = params.mp_data[params.pass_offset + 1];
+  int pass = params.mp_data[params.num_partitions + 1];
 
   // The first thread should increment the pass.
-  int first_thread = !(threadIdx.x | blockIdx.x);
+  int first_thread = !threadIdx.x && !blockIdx.x;
   if(first_thread)
-    params.mp_data[params.pass_offset] = pass + 1;
+    params.mp_data[params.num_partitions] = pass + 1;
 
   int coop = 2<< pass;
   kernel_mergesort_pass<nt, vt>(
-    readonly_iterator_t<int, mp>(),
+    params.mp_data,
     params.keys_in,
     params.vals_in,
     params.keys_out,
@@ -237,8 +237,8 @@ template<
   vals_out_it vals_out;
 
   int count;
+  int num_partitions;
   int spacing;
-  int pass_offset;
   comp_t comp;
 };
 
@@ -283,7 +283,7 @@ struct mergesort_pipeline_t {
 
     params.count = count;
     params.spacing = nv;
-    params.pass_offset = info.num_partitions;
+    params.num_partitions = info.num_partitions;
     params.comp = comp;
 
     // Ping pong with this buffer.
@@ -314,6 +314,7 @@ struct mergesort_pipeline_t {
     gl_dispatch_kernel<kernel_blocksort<false, nt, vt, params_t, 0> >(
       info.num_ctas
     );
+      glFinish();
     
     // Execute the merge passes.
     for(int pass = 0; pass < info.num_passes; ++pass) {
@@ -322,20 +323,29 @@ struct mergesort_pipeline_t {
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys2);
 
       // Launch the partitions kernel.
-      gl_dispatch_kernel<kernel_mergesort_partition<params_t, 2> >(
+      gl_dispatch_kernel<kernel_mergesort_partition<params_t> >(
         info.num_partition_ctas);
 
-      auto vec = partitions_ssbo.get_data();
-      printf("%d: %d\n", @range(), vec[:])...;
+      glFinish();
 
+     // auto vec = partitions_ssbo.get_data();
+     // printf("%d: %d\n", @range(), vec[:])...;
+//
       // Launch the mergesort pass kernel.
-      gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 2, 0> >(
-        info.num_ctas
-      );
+    // if(1 == pass) {
+    //   glCopyNamedBufferSubData(keys, keys2, 0, 0, count * sizeof(key_t));
+    //   return;
+    // } else {
+//
+        gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, params_t, 0> >(
+          info.num_ctas
+        ); 
+     // }
+
+      glFinish();
 
       std::swap(keys, keys2);
     }
-    
   }
 
   template<int nt = 256, int vt = 7>
