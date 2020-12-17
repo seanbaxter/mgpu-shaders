@@ -1,9 +1,7 @@
-#include "meta.hxx"
+#pragma once
+#include "buffer.hxx"
 #include <cstdlib>
 #include <cstdio>
-
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 
 BEGIN_MGPU_NAMESPACE

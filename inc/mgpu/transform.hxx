@@ -1,6 +1,6 @@
 #pragma once
 #include <gl3w/GL/gl3w.h>
-#include "bindings.hxx"
+#include "buffer.hxx"
 
 BEGIN_MGPU_NAMESPACE
 

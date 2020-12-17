@@ -33,7 +33,6 @@ constexpr int s_log2(int x) {
     x>>= 1;
     ++i;
   }
-
   return i;
 }
 

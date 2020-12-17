@@ -76,7 +76,8 @@ struct cta_sort_t {
     num_passes = s_log2(nt)
   };
 
-  union storage_t {
+  // TODO: Modify to aliased union.
+  struct storage_t {
     key_t keys[nt * vt + 1];
     val_t vals[nt * vt];
   };
@@ -84,8 +85,8 @@ struct cta_sort_t {
   typedef kv_array_t<key_t, val_t, vt> array_t;
 
   template<typename comp_t>
-  array_t merge_pass(array_t x, int tid, int count, int pass, comp_t comp, 
-    storage_t& storage) {
+  static array_t merge_pass(array_t x, int tid, int count, int pass, 
+    comp_t comp, storage_t& storage) {
 
     // Divide the CTA's keys into lists.
     int coop = 2<< pass;
@@ -107,8 +108,8 @@ struct cta_sort_t {
   }
 
   template<typename comp_t>
-  array_t block_sort(array_t x, int tid, int count, comp_t comp, 
-    storage_t& storage) const {
+  static array_t block_sort(array_t x, int tid, int count, comp_t comp, 
+    storage_t& storage) {
 
     // Sort the inputs within each thread. If any threads have fewer than
     // vt items, use the segmented sort network to prevent out-of-range

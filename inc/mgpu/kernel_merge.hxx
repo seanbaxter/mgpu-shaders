@@ -206,7 +206,7 @@ struct merge_pipeline_t {
   > params_t;
 
   gl_buffer_t<int[]>    partitions_ssbo;
-  gl_buffer_t<params_t> params_ubo;
+  gl_buffer_t<const params_t> params_ubo;
 };
 
 END_MGPU_NAMESPACE

@@ -29,7 +29,9 @@ kv_array_t<key_t, val_t, vt> odd_even_sort(kv_array_t<key_t, val_t, vt> x,
     @meta for(int i = 1 & I; i < vt - 1; i += 2) {
       if((0 == ((2<< i) & flags)) && comp(x.keys[i + 1], x.keys[i])) {
         std::swap(x.keys[i], x.keys[i + 1]);
-        std::swap(x.vals[i], x.vals[i + 1]);
+
+        if constexpr(!std::is_same_v<val_t, empty_t>)
+          std::swap(x.vals[i], x.vals[i + 1]);
       }
     }
   }
