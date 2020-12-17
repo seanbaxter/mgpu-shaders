@@ -6,6 +6,14 @@
 BEGIN_MGPU_NAMESPACE
 
 template<auto index, typename type_t = @enum_type(index)>
+[[using spirv: in, location((int)index)]]
+type_t shader_in;
+
+template<auto index, typename type_t = @enum_type(index)>
+[[using spirv: out, location((int)index)]]
+type_t shader_out;
+
+template<auto index, typename type_t = @enum_type(index)>
 [[using spirv: uniform, binding((int)index)]]
 type_t shader_uniform;
 
