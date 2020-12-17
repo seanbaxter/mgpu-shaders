@@ -5,7 +5,7 @@
 BEGIN_MGPU_NAMESPACE
 
 constexpr int out_of_range_flags(int first, int vt, int count) {
-  int out_of_range = std::min(vt, first + vt - count);
+  int out_of_range = min(vt, first + vt - count);
   int head_flags = 0;
   if(out_of_range > 0) {
     const int mask = (1<< vt) - 1;
@@ -36,9 +36,9 @@ constexpr merge_range_t compute_mergesort_range(int count, int partition,
   merge_range_t frame = compute_mergesort_frame(partition, coop, spacing);
   return merge_range_t {
     frame.a_begin,
-    std::min(count, frame.a_end),
-    std::min(count, frame.b_begin),
-    std::min(count, frame.b_end)
+    min(count, frame.a_end),
+    min(count, frame.b_begin),
+    min(count, frame.b_end)
   };
 }
 
@@ -58,11 +58,11 @@ constexpr merge_range_t compute_mergesort_range(int count, int partition,
   // in this merge operation.
   if(coop - 1 != ((coop - 1) & partition)) {
     range.a_end = range.a_begin + mp1;
-    range.b_end = std::min(count, range.b_begin + diag + spacing - mp1);
+    range.b_end = min(count, range.b_begin + diag + spacing - mp1);
   }
 
   range.a_begin = range.a_begin + mp0;
-  range.b_begin = std::min(count, range.b_begin + diag - mp0);
+  range.b_begin = min(count, range.b_begin + diag - mp0);
 
   return range;
 }

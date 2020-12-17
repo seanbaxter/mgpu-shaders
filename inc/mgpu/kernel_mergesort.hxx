@@ -149,8 +149,11 @@ void kernel_mergesort_pass(mp_it mp_data,
   int tid = threadIdx.x;
   int cta = blockIdx.x;
 
-  [[spirv::shared]] key_t keys[nv + 1];
-  [[spirv::shared]] int   indices[nv];
+  struct shared_t {
+    key_t keys[nv + 1];
+    int indices[nv];
+  };
+  [[spirv::shared]] shared_t shared; 
 
   range_t tile = get_tile(cta, nv, count);
 
@@ -158,23 +161,23 @@ void kernel_mergesort_pass(mp_it mp_data,
   merge_range_t range = compute_mergesort_range(count, cta, coop, nv, 
     mp_data[cta + 0], mp_data[cta + 1]);
 
-  merge_pair_t<key_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
-    keys_in, keys_in, range, tid, comp, keys);
-
-  // Store merged values back out.
-  reg_to_mem_thread<nt>(merge.keys, tid, tile.count(), 
-    keys_out + tile.begin, keys);
-
-  if(has_values) {
-    // Transpose the indices from thread order to strided order.
-    std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices,
-      tid, indices);
-
-    // Gather the input values and merge into the output values.
-    transfer_two_streams_strided<nt>(vals_in + range.a_begin, 
-      range.a_count(), vals_in + range.b_begin, range.b_count(),
-      indices, tid, vals_out + tile.begin);
-  }
+//  merge_pair_t<key_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
+//    keys_in, keys_in, range, tid, comp, shared.keys);
+//
+//  // Store merged values back out.
+//  reg_to_mem_thread<nt>(merge.keys, tid, tile.count(), 
+//    keys_out + tile.begin, shared.keys);
+//
+//  if(has_values) {
+//    // Transpose the indices from thread order to strided order.
+//    std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices,
+//      tid, shared.indices);
+//
+//    // Gather the input values and merge into the output values.
+//    transfer_two_streams_strided<nt>(vals_in + range.a_begin, 
+//      range.a_count(), vals_in + range.b_begin, range.b_count(),
+//      indices, tid, vals_out + tile.begin);
+//  }
 }
 
 template<int nt, int vt, typename params_t, int mp, int ubo>
@@ -296,6 +299,7 @@ struct mergesort_pipeline_t {
 
     params_t params { };
     int num_passes = params.configure(count, nv, comp);
+    num_passes = 0;
     ctas_t ctas = reserve(num_passes, count, nv);
 
     // Ping pong with this buffer.
@@ -315,13 +319,13 @@ struct mergesort_pipeline_t {
       if(num_passes % 2) {
         // Read the input and write to the aux buffer.
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, keys2);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys2);
         std::swap(keys, keys2);
 
       } else {
         // Read the input and write to the input.
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, keys);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys);
       }
 
       // Launch the blocksort kernel.
@@ -329,7 +333,7 @@ struct mergesort_pipeline_t {
         ctas.num_ctas
       );
     }
-
+/*
     // Bind the partitions buffer.
     partitions_ssbo.bind_ssbo(2);
 
@@ -344,19 +348,20 @@ struct mergesort_pipeline_t {
 
       // Bind the inputs and outputs.
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keys);
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, keys2);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, keys2);
 
       // Launch the partitions kernel.
-      gl_dispatch_kernel<kernel_mergesort_partition<pass_t, 2> >(
-        ctas.num_partition_ctas);
+     gl_dispatch_kernel<kernel_mergesort_partition<pass_t, 2> >(
+       ctas.num_partition_ctas);
 
-      // Launch the mergesort pass kernel.
-      gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, pass_t, 2, 0> >(
-        ctas.num_ctas
-      );
+   //  // Launch the mergesort pass kernel.
+   //  gl_dispatch_kernel<kernel_mergesort_pass<nt, vt, pass_t, 2, 0> >(
+   //    ctas.num_ctas
+   //  );
 
       std::swap(keys, keys2);
     }
+    */
   }
 
   template<int nt = 256, int vt = 7>

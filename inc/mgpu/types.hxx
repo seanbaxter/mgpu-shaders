@@ -13,7 +13,7 @@ struct alignas(16) range_t {
 };
 
 inline range_t get_tile(int cta, int nv, int count) noexcept {
-  return range_t { nv * cta, std::min(count, nv * (cta + 1)) };
+  return range_t { nv * cta, min(count, nv * (cta + 1)) };
 }
 
 struct alignas(16) merge_range_t {
