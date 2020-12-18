@@ -46,7 +46,7 @@ void kernel_blocksort(
     // If we're sorting key/index pairs, sythesize the data without sampling
     // the counting_iterator, which would perform a trip through shared 
     // memory.
-    int index = nv * cta + vt * tid;
+    int index = vt * (nt * cta + tid);
     @meta for(int i = 0; i < vt; ++i)
       unsorted.vals[i] = index + i;
 
@@ -382,6 +382,7 @@ struct mergesort_pipeline_t {
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, vals2);
 
       std::swap(keys, keys2);
+      std::swap(vals, vals2);
 
     } else {
       // Read the input and write to the input.

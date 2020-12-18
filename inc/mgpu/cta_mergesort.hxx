@@ -72,7 +72,7 @@ struct cta_sort_t {
   static_assert(is_pow2(nt));
 
   enum {
-    // has_values = !std::is_same<val_t, 
+    has_values = !std::is_same_v<val_t, empty_t>,
     num_passes = s_log2(nt)
   };
 
@@ -104,6 +104,12 @@ struct cta_sort_t {
       storage.keys, range.partition(mp, diag), comp);
     x.keys = merge.keys;
 
+    if constexpr(has_values) {
+      // Reorder values through shared memory.
+      reg_to_shared_thread<nt, vt>(x.vals, tid, storage.vals);
+      x.vals = shared_gather<nt, vt>(storage.vals, merge.indices);
+    }
+    
     return x;
   }
 
@@ -123,7 +129,7 @@ struct cta_sort_t {
     // Merge threads starting with a pair until all values are merged.
     for(int pass = 0; pass < num_passes; ++pass)
       x = merge_pass(x, tid, count, pass, comp, storage);
-    
+
     return x;
   }
 };

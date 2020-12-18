@@ -45,6 +45,11 @@ struct gl_buffer_t {
       glNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
     }
   }
+  void set_data(const std::vector<type_t>& data) {
+    resize(data.size());
+    set_data(data.data());
+  }
+
   void get_data(type_t* data) noexcept {
     if(count) {
       assert(buffer);
@@ -72,9 +77,11 @@ struct gl_buffer_t {
   }
 
   void resize(int count2) {
-    gl_buffer_t buffer2(count2);
-    std::swap(buffer, buffer2.buffer);
-    std::swap(count, buffer2.count);
+    if(count != count2) {
+      gl_buffer_t buffer2(count2);
+      std::swap(buffer, buffer2.buffer);
+      std::swap(count, buffer2.count); 
+    }
   }
 
   GLuint buffer;
