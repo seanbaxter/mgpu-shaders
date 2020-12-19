@@ -49,11 +49,27 @@ struct gl_buffer_t {
     resize(data.size());
     set_data(data.data());
   }
+  void set_data_range(const type_t* data, int first, int count) {
+    assert(first + count <= this->count);
+    if(count) {
+      assert(buffer);
+      glNamedBufferSubData(buffer, sizeof(type_t) * first, 
+        count * sizeof(type_t), data);
+    }
+  }
 
   void get_data(type_t* data) noexcept {
     if(count) {
       assert(buffer);
       glGetNamedBufferSubData(buffer, 0, sizeof(type_t) * count, data);
+    }
+  }
+
+  void clear_bytes() {
+    if(count && buffer) {
+      char zero = 0;
+      glClearNamedBufferData(buffer, GL_R8I, GL_RED_INTEGER, 
+        GL_UNSIGNED_BYTE, &zero);
     }
   }
 
@@ -76,9 +92,16 @@ struct gl_buffer_t {
     return vec;
   }
 
-  void resize(int count2) {
+  void resize(int count2, bool preserve = false) {
     if(count != count2) {
       gl_buffer_t buffer2(count2);
+
+      if(preserve && count && count2) {
+        // Copy the old data into the new buffer.
+        glCopyNamedBufferSubData(buffer, buffer2, 0, 0, 
+          std::min(count, count2) * sizeof(type_t));
+      }
+
       std::swap(buffer, buffer2.buffer);
       std::swap(count, buffer2.count); 
     }

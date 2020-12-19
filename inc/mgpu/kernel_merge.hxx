@@ -29,7 +29,7 @@ void kernel_merge(
   int tid = threadIdx.x;
   int cta = blockIdx.x;
  
-  union [[spirv::alias]] shared_t {
+  struct shared_t {
     key_t keys[nv + 1];
     int indices[nv];
   };
