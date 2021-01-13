@@ -1,5 +1,5 @@
-#include <mgpu/transform.hxx>
-#include <mgpu/app.hxx>
+#include <mgpu/gl/transform.hxx>
+#include <mgpu/gl/app.hxx>
 #include <cmath>
 #include <cstdio>
 

@@ -1,5 +1,5 @@
-#include <mgpu/kernel_merge.hxx>
-#include <mgpu/app.hxx>
+#include <mgpu/gl/merge.hxx>
+#include <mgpu/gl/app.hxx>
 
 #include <cstdio>
 #include <algorithm>

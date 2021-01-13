@@ -1,5 +1,5 @@
-#include <mgpu/kernel_mergesort.hxx>
-#include <mgpu/app.hxx>
+#include <mgpu/gl/mergesort.hxx>
+#include <mgpu/gl/app.hxx>
 
 using namespace mgpu;
 // key-index sort.

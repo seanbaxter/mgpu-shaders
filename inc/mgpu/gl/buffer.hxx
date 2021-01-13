@@ -1,5 +1,5 @@
 #pragma once
-#include "bindings.hxx"
+#include "../common/bindings.hxx"
 
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl3w.h>
