@@ -1,6 +1,5 @@
 #pragma once
 #include "cta_merge.hxx"
-#include "kernel_partition.hxx"
 
 BEGIN_MGPU_NAMESPACE
 
@@ -28,11 +27,8 @@ void kernel_merge(
   int tid = threadIdx.x;
   int cta = blockIdx.x;
  
-  struct shared_t {
-    key_t keys[nv + 1];
-    int indices[nv];
-  };
-  [[spirv::shared]] shared_t shared;
+  [[spirv::shared]] key_t shared_keys[nv + 1];
+  [[spirv::shared]] int shared_indices[nv];
 
   // Load the range for this CTA and merge the values into register.
   int mp0 = mp_data[cta + 0];
@@ -41,16 +37,16 @@ void kernel_merge(
     mp0, mp1);
 
   merge_pair_t<key_t, vt> merge = cta_merge_from_mem<bounds_lower, nt, vt>(
-     a_keys, b_keys, range, tid, comp, shared.keys);
+    a_keys, b_keys, range, tid, comp, shared_keys);
 
   int dest_offset = nv * cta;
   reg_to_mem_thread<nt>(merge.keys, tid, range.total(), c_keys + dest_offset,
-    shared.keys);
-  
+    shared_keys);
+
   if constexpr(!std::is_same_v<empty_t, val_t>) {
     // Transpose the indices from thread order to strided order.
     std::array<int, vt> indices = reg_thread_to_strided<nt>(merge.indices, tid, 
-      shared.indices);
+      shared_indices);
   
     // Gather the input values and merge into the output values.
     transfer_two_streams_strided<nt>(a_vals + range.a_begin, range.a_count(),

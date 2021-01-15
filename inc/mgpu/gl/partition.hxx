@@ -1,5 +1,5 @@
 #pragma once
-#include "../common/kernel_partition.hxx"
+#include "../common/cta_merge.hxx"
 #include "transform.hxx"
 
 BEGIN_MGPU_NAMESPACE
@@ -9,21 +9,20 @@ template<bounds_t bounds, typename params_t, int mp, int ubo>
 void kernel_partition() {
   // Load the kernel parameters from the uniform buffer at binding=ubo.
   params_t params = shader_uniform<ubo, params_t>;
+  int a_count = params.a_count;
+  int b_count = params.b_count;
+  int spacing = params.spacing;
 
-  // Launch the kernel using kernel parameters.
-  kernel_partition<bounds>(
-    writeonly_iterator_t<int, mp>(),
-    params.a_keys,
-    params.a_count,
-    params.b_keys,
-    params.b_count,
-    params.spacing,
-    params.comp
-  );
-}
+  int num_partitions = num_merge_partitions(a_count + b_count, spacing);
+  int index = threadIdx.x + blockDim.x * blockIdx.x;
 
-int num_merge_partitions(int count, int spacing) {
-  return div_up(count, spacing) + 1;
+  if(index < num_partitions) {
+    int diag = min(spacing * index, a_count + b_count);
+
+    writeonly_iterator_t<int, mp> mp_data;
+    mp_data[index] = merge_path<bounds>(params.a_keys, a_count, params.b_keys,
+      b_count, diag, params.comp);
+  }
 }
 
 template<bounds_t bounds, typename params_t, int mp, int ubo = 0>

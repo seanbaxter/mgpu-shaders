@@ -3,6 +3,10 @@
 
 BEGIN_MGPU_NAMESPACE
 
+constexpr int num_merge_partitions(int count, int spacing) {
+  return div_up(count, spacing) + 1;
+}
+
 template<bounds_t bounds = bounds_lower, typename a_keys_it,
   typename b_keys_it, typename comp_t>
 int merge_path(a_keys_it a_keys, int a_count, b_keys_it b_keys, 
@@ -59,11 +63,16 @@ template<int nt, int vt, typename type_t, typename a_it, typename b_it>
 std::array<type_t, vt> load_two_streams_reg(a_it a, int a_count, b_it b, 
   int b_count, int tid) {
 
-  b -= a_count;
+ // b -= a_count;
   std::array<type_t, vt> x;
 
   strided_iterate<nt, vt>([&](int i, int index) {
-    x[i] = (index < a_count) ? a[index] : b[index];
+ //   x[i] = (index < a_count) ? a[index] : b[index];
+    if(index < a_count)
+      x[i] = a[index];
+    else if(index < a_count + b_count)
+      x[i] = b[index - a_count];
+
   }, tid, a_count + b_count);
 
   return x;
@@ -146,7 +155,7 @@ merge_pair_t<type_t, vt> cta_merge_from_mem(a_it a, b_it b,
   // Load the data into shared memory.
   load_two_streams_shared<nt, vt>(a + range_mem.a_begin, range_mem.a_count(),
     b + range_mem.b_begin, range_mem.b_count(), tid, keys_shared);
-
+ 
   // Run a merge path to find the start of the serial merge for each thread.
   merge_range_t range_local = range_mem.to_local();
   int diag = vt * tid;
@@ -157,8 +166,7 @@ merge_pair_t<type_t, vt> cta_merge_from_mem(a_it a, b_it b,
   // only vt elements will be merged.
   merge_pair_t<type_t, vt> merged = serial_merge<bounds, vt>(keys_shared,
     range_local.partition(mp, diag), comp);
-  merged.mp = mp;
-
+  
   return merged;
 };
 
