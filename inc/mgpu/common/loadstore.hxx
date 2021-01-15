@@ -107,6 +107,7 @@ std::array<typename std::iterator_traits<it_t>::value_type, vt>
 mem_to_reg_strided(it_t mem, int tid, int count) {
   typedef typename std::iterator_traits<it_t>::value_type type_t;
   std::array<type_t, vt> x;
+  
   // strided_iterate<nt, vt, vt0>([&](int i, int j) { 
   //  x[i] = mem[j]; 
   //  }, tid, count);

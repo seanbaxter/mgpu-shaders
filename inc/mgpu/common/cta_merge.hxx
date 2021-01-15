@@ -58,21 +58,13 @@ merge_range_t compute_merge_range(int a_count, int b_count, int partition,
   return merge_range_t { mp0, mp1, diag0 - mp0, diag1 - mp1 };
 }
 
-
 template<int nt, int vt, typename type_t, typename a_it, typename b_it>
 std::array<type_t, vt> load_two_streams_reg(a_it a, int a_count, b_it b, 
   int b_count, int tid) {
 
- // b -= a_count;
   std::array<type_t, vt> x;
-
   strided_iterate<nt, vt>([&](int i, int index) {
- //   x[i] = (index < a_count) ? a[index] : b[index];
-    if(index < a_count)
-      x[i] = a[index];
-    else if(index < a_count + b_count)
-      x[i] = b[index - a_count];
-
+    x[i] = (index < a_count) ? a[index] : b[index - a_count];
   }, tid, a_count + b_count);
 
   return x;
@@ -93,10 +85,9 @@ template<int nt, int vt, typename type_t, typename a_it, typename b_it>
 std::array<type_t, vt> gather_two_streams_strided(a_it a, int a_count, 
   b_it b, int b_count, std::array<int, vt> indices, int tid) {
 
-  b -= a_count;
   std::array<type_t, vt> x;
   strided_iterate<nt, vt>([&](int i, int j) { 
-    x[i] = (indices[i] < a_count) ? a[indices[i]] : b[indices[i]];
+    x[i] = (indices[i] < a_count) ? a[indices[i]] : b[indices[i] - a_count];
   }, tid, a_count + b_count);
 
   return x;
@@ -166,7 +157,7 @@ merge_pair_t<type_t, vt> cta_merge_from_mem(a_it a, b_it b,
   // only vt elements will be merged.
   merge_pair_t<type_t, vt> merged = serial_merge<bounds, vt>(keys_shared,
     range_local.partition(mp, diag), comp);
-  
+
   return merged;
 };
 

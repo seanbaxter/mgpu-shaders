@@ -34,14 +34,14 @@ void merge(
 
   int num_blocks = div_up(a_count + b_count, nv);
   launch<nt>(num_blocks, cmd_buffer, [=](int tid, int block) {
-  //  if constexpr(has_values) {
+    if constexpr(std::is_same_v<val_t, empty_t>) {
       kernel_merge<nt, vt>(partitions, a_keys, a_vals, a_count, b_keys, 
         b_vals, b_count, c_keys, c_vals, comp);
 
-  //  } else {
-  //    kernel_merge<nt, vt>(partitions, a_keys, (empty_t*)nullptr, a_count,
-  //      b_keys, (empty_t*)nullptr, b_count, c_keys, (empty_t*)nullptr, comp);
-  //  }
+    } else {
+      kernel_merge<nt, vt>(partitions, a_keys, (empty_t*)nullptr, a_count,
+        b_keys, (empty_t*)nullptr, b_count, c_keys, (empty_t*)nullptr, comp);
+    }
   });
 
  // cmd_buffer.context.free(partitions);
@@ -61,19 +61,3 @@ void merge(cmd_buffer_t& cmd_buffer, a_keys_it a_keys, int a_count,
 } // namespace vk
 
 END_MGPU_NAMESPACE
-
-
-  /*
-  cmd_buffer.host_barrier();
-  int* host = cmd_buffer.context.alloc_cpu<int>(num_partitions);
-  cmd_buffer.memcpy(host, partitions, sizeof(int) * num_partitions);
-  cmd_buffer.end();
-  cmd_buffer.submit();
-  
-  vkQueueWaitIdle(cmd_buffer.context.queue);
-
-  for(int i = 0; i < num_partitions; ++i)
-    printf("%d: %d\n", i, host[i]);
-
-  exit(0);
-  */
