@@ -23,7 +23,7 @@ int main() {
   cmd_buffer.host_barrier();
 
   // Execute the parallel mergesort.
-  mergesort_cache_t cache(context);
+  memcache_t cache(context);
   mergesort_keys(cmd_buffer, cache, gpu, count);
 
   // Retrieve the results.
