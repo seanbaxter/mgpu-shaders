@@ -6,6 +6,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+namespace gl {
+
 struct app_t {
   app_t(const char* name);
 
@@ -55,5 +57,7 @@ void app_t::_debug_callback(GLenum source, GLenum type, GLuint id,
   app_t* app = (app_t*)user_param;
   app->debug_callback(source, type, id, severity, length, message);
 }
+
+} // namespace gl
 
 END_MGPU_NAMESPACE

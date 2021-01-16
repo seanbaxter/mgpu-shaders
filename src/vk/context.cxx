@@ -199,6 +199,8 @@ void* context_t::alloc_cpu(size_t size, uint32_t usage) {
   return p;
 }
 void context_t::free(void* p) {
+  if(!p) return;
+  
   auto it = buffer_map.find(p);
   assert(buffer_map.end() != it && p == it->first);
 
@@ -392,6 +394,43 @@ void cmd_buffer_t::host_barrier() {
 void cmd_buffer_t::memcpy(void* dest, void* source, size_t size) {
   context.memcpy(vkCommandBuffer, dest, source, size);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+memcache_t::memcache_t(context_t& context) :
+  context(context), data(nullptr), capacity(0) { }
+
+memcache_t::~memcache_t() {
+  context.free(data);
+}
+
+void memcache_t::allocate(const size_t* sizes, int count, void** allocations) {
+  size_t total = 0;
+  for(int i = 0; i < count; ++i) {
+    // Round up to a multiple of 256 bytes.
+    size_t reserve = ~255 & (sizes[i] + 255);
+    total += reserve;
+  }
+
+  // Allocate space in a single buffer.
+  char* p = allocate<char>(total);
+  for(int i = 0; i < count; ++i) {
+    allocations[i] = p;
+    p += ~255 & (sizes[i] + 255);
+  }
+}
+
+void* memcache_t::allocate(size_t size) {
+  if(size > capacity) {
+    context.free(data);
+    data = context.alloc_gpu(size);
+    capacity = size;
+  }
+  return data;
+}
+
+
 
 } // namespace vk
 

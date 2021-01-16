@@ -1,7 +1,9 @@
 #include <mgpu/gl/mergesort.hxx>
 #include <mgpu/gl/app.hxx>
+#include <mgpu/gl/buffer.hxx>
 
-using namespace mgpu;
+using namespace mgpu::gl;
+
 // key-index sort.
 // sort keys in place and fill with gather indices.
 

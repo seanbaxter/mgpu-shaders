@@ -106,6 +106,32 @@ struct cmd_buffer_t {
   VkCommandBuffer vkCommandBuffer;
 };
 
+struct memcache_t {
+  memcache_t(context_t& context);
+  ~memcache_t();
+
+  // Request a single allocation.
+  template<typename type_t> 
+  type_t* allocate(size_t count) {
+    return (type_t*)allocate(sizeof(type_t) * count);
+  }
+
+  void* allocate(size_t size);
+
+  // Allocate cache-line aligned memories that fit these sizes.
+  template<size_t count>
+  std::array<void*, count> allocate(std::array<size_t, count> sizes) {
+    std::array<void*, count> data;
+    allocate(sizes.data(), count, &data.data());
+    return data;
+  }
+  void allocate(const size_t* sizes, int count, void** allocations);
+
+  context_t& context;
+  void* data;
+  size_t capacity;
+};
+
 } // namespace vk
 
 END_MGPU_NAMESPACE

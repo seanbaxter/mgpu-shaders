@@ -4,6 +4,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+namespace gl {
+
 template<bool sort_indices, int nt, int vt, typename params_t, int ubo>
 [[using spirv: comp, local_size(nt)]]
 void kernel_blocksort() {
@@ -66,8 +68,6 @@ void kernel_mergesort_partition() {
 template<int nt, int vt, typename params_t, int ubo>
 [[using spirv: comp, local_size(nt)]]
 void kernel_mergesort_pass() {
-  // THIS LINE BREAKS! FIX!
-  // const params_t& params = shader_uniform<ubo, params_t>;
   params_t params = shader_uniform<ubo, params_t>;
 
   // Load the pass.
@@ -321,5 +321,7 @@ struct mergesort_pipeline_t {
   gl_buffer_t<val_t[]> vals_ssbo;
   gl_buffer_t<int[]>   partitions_ssbo;
 };
+
+} // namespace gl
 
 END_MGPU_NAMESPACE

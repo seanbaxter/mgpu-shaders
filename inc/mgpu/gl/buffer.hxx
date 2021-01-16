@@ -6,6 +6,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+namespace gl {
+
 template<
   typename T, 
   bool is_array = std::is_array_v<T>, 
@@ -203,5 +205,7 @@ struct gl_buffer_t<T, false, true> {
   bool invalid;
   std::optional<type_t> data;
 };
+
+} // namespace gl
 
 END_MGPU_NAMESPACE

@@ -4,6 +4,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+namespace gl {
+
 template<auto kernel>
 void gl_dispatch_kernel(int x, bool membar = true) {
   static GLuint program = 0;
@@ -55,5 +57,7 @@ void gl_transform(func_t func, int count, bool membar = true) {
   int num_ctas = div_up(count, nt);
   gl_dispatch_kernel<kernel_transform<ubo, nt, data_t> >(num_ctas, membar);
 }
+
+} // namespace gl
 
 END_MGPU_NAMESPACE
