@@ -28,7 +28,7 @@ int main() {
 
   // Three ways to launch kernels with mgpu-shaders for Vulkan:
 
-  // 1. Use chevron launch syntax. This calls spirv_compute_dispatch and 
+  // 1. Use chevron launch syntax. This calls spirv_chevron_comp and 
   //    passes the shader reference as the template argument. In mgpu's 
   //    implementation, num_blocks and cmd_buffer are the chevron arguments.
   const int NT = 64;    // Use 64 threads per block.

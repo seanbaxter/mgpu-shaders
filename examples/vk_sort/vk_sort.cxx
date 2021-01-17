@@ -30,7 +30,7 @@ int main() {
   cmd_buffer.memcpy(host, gpu, sizeof(float) * count);
   cmd_buffer.host_barrier();
 
-  // End and submite the command buffer.
+  // End and submit the command buffer.
   cmd_buffer.end();
   context.submit(cmd_buffer);
 
