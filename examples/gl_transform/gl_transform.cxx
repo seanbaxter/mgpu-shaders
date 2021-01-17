@@ -3,8 +3,7 @@
 #include <cmath>
 #include <cstdio>
 
-// It's back, baby. 
-using namespace mgpu;
+using namespace mgpu::gl;
 
 int main() {
   // Initialize OpenGL and create an offscreen window.

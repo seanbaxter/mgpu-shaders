@@ -5,6 +5,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+namespace gl {
+
 template<int nt, int vt, typename params_t, int mp, int ubo>
 [[using spirv: comp, local_size(nt)]]
 void kernel_merge() {
@@ -153,5 +155,7 @@ struct merge_pipeline_t {
   gl_buffer_t<int[]>    partitions_ssbo;
   gl_buffer_t<const params_t> params_ubo;
 };
+
+} // namespace gl
 
 END_MGPU_NAMESPACE

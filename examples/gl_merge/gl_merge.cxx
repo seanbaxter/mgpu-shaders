@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <algorithm>
 
-using namespace mgpu;
+using namespace mgpu::gl;
 
 template<int nt, int vt, typename type_t, typename comp_t = std::less<type_t> >
 std::vector<type_t> gpu_merge(const std::vector<type_t>& a, 

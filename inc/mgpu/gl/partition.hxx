@@ -4,6 +4,8 @@
 
 BEGIN_MGPU_NAMESPACE
 
+namespace gl {
+
 template<bounds_t bounds, typename params_t, int mp, int ubo>
 [[using spirv: comp, local_size(128)]]
 void kernel_partition() {
@@ -30,5 +32,7 @@ void launch_partition(int count, int spacing) {
   int num_ctas = div_up(num_merge_partitions(count, spacing), 128);
   gl_dispatch_kernel<kernel_partition<bounds, params_t, mp, ubo> >(num_ctas);
 }
+
+} // namespace gl
 
 END_MGPU_NAMESPACE
