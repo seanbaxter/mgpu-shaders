@@ -1,6 +1,6 @@
 #pragma once
 
-#if __circle__lang < 114
+#if __circle_build__ < 114
 #error "Circle build 114 required"
 #endif
 

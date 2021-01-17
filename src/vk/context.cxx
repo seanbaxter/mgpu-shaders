@@ -155,7 +155,7 @@ context_t::~context_t() {
 
 void* context_t::alloc_gpu(size_t size, uint32_t usage) {
   VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-  bufferInfo.size = size;
+  bufferInfo.size = std::max(size, 1ul);
   bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | usage;
    
   VmaAllocationCreateInfo allocInfo = {};
@@ -180,7 +180,7 @@ void* context_t::alloc_gpu(size_t size, uint32_t usage) {
 
 void* context_t::alloc_cpu(size_t size, uint32_t usage) {
   VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-  bufferInfo.size = size;
+  bufferInfo.size = std::max(size, 1ul);
   bufferInfo.usage = usage;
    
   VmaAllocationCreateInfo allocInfo = {};
@@ -224,6 +224,8 @@ context_t::buffer_it_t context_t::find_buffer(void* p) {
 
 void context_t::memcpy(VkCommandBuffer cmd_buffer, void* dest, void* source, 
   size_t size) {
+
+  if(!size) return;
 
   buffer_it_t dest_it = find_buffer(dest);
   buffer_it_t source_it = find_buffer(source);

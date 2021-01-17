@@ -33,7 +33,7 @@ int main() {
   //    implementation, num_blocks and cmd_buffer are the chevron arguments.
   const int NT = 64;    // Use 64 threads per block.
   int num_blocks = mgpu::div_up(count, NT);
-  compute_shader<<<num_blocks, cmd_buffer>>>(count, M_PIf32, x, y);
+  compute_shader<NT><<<num_blocks, cmd_buffer>>>(count, M_PIf32, x, y);
 
   // 2. Use launch(). This is like a chevron launch, but you don't even have
   //    to write a shader. Pass it a function object or lambda. The lambda

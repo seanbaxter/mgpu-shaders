@@ -34,14 +34,8 @@ void merge(
 
   int num_blocks = div_up(a_count + b_count, nv);
   launch<nt>(num_blocks, cmd_buffer, [=](int tid, int block) {
-    if constexpr(std::is_same_v<val_t, empty_t>) {
-      kernel_merge<nt, vt>(partitions, a_keys, a_vals, a_count, b_keys, 
-        b_vals, b_count, c_keys, c_vals, comp);
-
-    } else {
-      kernel_merge<nt, vt>(partitions, a_keys, (empty_t*)nullptr, a_count,
-        b_keys, (empty_t*)nullptr, b_count, c_keys, (empty_t*)nullptr, comp);
-    }
+    kernel_merge<nt, vt>(partitions, a_keys, a_vals, a_count, b_keys, 
+      b_vals, b_count, c_keys, c_vals, comp);
   });
 }
 

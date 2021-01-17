@@ -18,7 +18,7 @@ void mergesort_kv(cmd_buffer_t& cmd_buffer, memcache_t& cache,
   int num_ctas = div_up(count, nt * vt);
   int num_passes = find_log2(num_ctas, true);
 
-  if(num_ctas < 2) {
+  if(0 == num_passes) {
     // For a single CTA, sort in place and don't require any cache memory.
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {
       kernel_blocksort<sort_indices, nt, vt>(keys, vals, keys, vals, 
