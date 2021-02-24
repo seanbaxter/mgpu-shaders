@@ -11,9 +11,9 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  enum { nt = 128 };
-  int count = nt;
-  int num_blocks = div_up(count, nt);
+  enum { nt = 128, vt = 5, nv = nt * vt };
+  int count = nt * vt;
+  int num_blocks = div_up(count, nv);
   int* data = context.alloc_gpu<int>(count);
 
   // Create a command buffer.
@@ -22,13 +22,19 @@ int main() {
 
   launch<nt>(num_blocks, cmd_buffer, [=](int tid, int cta) {
     // We can now put the scan's storage_t into a union!
+    int gid = nt * cta + tid;
+
     typedef cta_scan_t<nt, int> scan_t;
     [[spirv::shared]] scan_t::storage_t shared;
 
     // Just scan 1.
-    auto result = scan_t().scan<scan_type_exc>(1, shared);
+    std::array<int, vt> x;
+    x...[:] = 1 ...;
 
-    data[tid] = result.scan;
+    auto result = scan_t().scan<scan_type_exc>(x, shared);
+
+    for(int i = 0; i < vt; ++i)
+      data[vt * gid + i] = result.scan[i];
   });
 
   // Copy the data to host memory.
