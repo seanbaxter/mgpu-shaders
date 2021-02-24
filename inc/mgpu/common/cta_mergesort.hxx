@@ -2,6 +2,8 @@
 #include "cta_merge.hxx"
 #include "sort_networks.hxx"
 
+#pragma spirv GL_EXT_shared_memory_block
+
 BEGIN_MGPU_NAMESPACE
 
 constexpr int out_of_range_flags(int first, int vt, int count) {
@@ -76,8 +78,7 @@ struct cta_sort_t {
     num_passes = s_log2(nt)
   };
 
-  // TODO: Modify to aliased union.
-  struct storage_t {
+  union storage_t {
     key_t keys[nt * vt + 1];
     val_t vals[nt * vt];
   };
