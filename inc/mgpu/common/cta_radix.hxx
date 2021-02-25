@@ -19,14 +19,14 @@ struct radix_permute_t {
     } else if constexpr(std::is_floating_point_v<type_t>) {
       // Always flip the most significant bit. Flip all other bits if the
       // most significant bit started flipped.
-      unsigned_type x = *(const unsigned_type*)&x;
+      unsigned_type y = *reinterpret_cast<const unsigned_type*>(&x);
       unsigned_type mask = 
         // Carry-in the sign bit to all lower bits
-        ((signed_type)x>> (8 * sizeof(type_t) - 1)) | 
+        ((signed_type)y>> (8 * sizeof(type_t) - 1)) | 
         // Always set the most significant bit
         ((unsigned_type)1<< (8 * sizeof(type_t) - 1));
 
-      return x ^ mask;
+      return y ^ mask;
 
     } else {
       static_assert("type cannot be converted to radix form");
@@ -54,7 +54,7 @@ struct radix_permute_t {
         (((unsigned_type)1<< (8 * sizeof(type_t) - 1)) - 1);
       x ^= mask;
 
-      return *(const type_t*)&x;
+      return *reinterpret_cast<const type_t*>(&x);
 
     } else {
       static_assert("type cannot be converted from radix form");

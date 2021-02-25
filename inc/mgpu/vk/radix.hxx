@@ -30,11 +30,10 @@ void radix_sort_cta(cmd_buffer_t& cmd_buffer, key_t* data, int count) {
       int offset = nt * i + tid;
       if(offset < count) {
         // If the key is in range, load it and convert to radix bits.
-        key_t key = data[offset];
-        keys[i] = radix_permute_t<key_t>::to_radix_bits(key);
+        keys[i] = radix_permute_t<key_t>::to_radix_bits(data[offset]);
 
       } else {
-        // Otherwise use -1.
+        // Otherwise set all radix bits so this key is sorted to the end.
         keys[i] = -1;
       }
     }}
@@ -60,7 +59,13 @@ void radix_sort_cta(cmd_buffer_t& cmd_buffer, key_t* data, int count) {
     }
 
     // Write from shared memory to device memory.
-    shared_to_mem<nt, vt>(shared.keys, tid, count, data);
+    @meta for(int i = 0; i < vt; ++i) {{
+      int offset = nt * i + tid;
+      if(offset < count) {
+        unsigned_type u = shared.keys[offset];
+        data[offset] = radix_permute_t<key_t>::from_radix_bits(u);
+      }
+    }}
   });
 }
 
