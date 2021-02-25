@@ -4,6 +4,62 @@
 
 BEGIN_MGPU_NAMESPACE
 
+////////////////////////////////////////////////////////////////////////////////
+
+template<int nt, typename type_t>
+struct cta_reduce_t {
+  struct storage_t {
+    type_t warps[nt / 8];
+  };
+
+  // Reduce the values across a cta. Only thread 0 returns a value. If all
+  // threads want the value, store to shared memory and broadcast.
+  template<typename op_t = std::plus<type_t> >
+  type_t reduce(type_t x, storage_t& shared, op_t op = op_t()) {
+    int warp_size = gl_SubgroupSize;
+    int num_warps = gl_NumSubgroups;
+    int lane = gl_SubgroupInvocationID;
+    int warp = gl_SubgroupID;
+
+    // Reduce within a warp.
+    for(int offset = 1; offset < warp_size; offset<<= 1) {
+      type_t y = subgroupShuffleDown(x, offset);
+      if(lane + offset < warp_size)
+        x = op(x, y);
+    }
+
+    // The first lane in each warp writes its reduction.
+    if(!lane)
+      shared.warps[warp] = x;
+    __syncthreads();
+
+    // Scan the reductions. This assumes we can do it in one shot.
+    if(lane < num_warps) {
+      x = shared.warps[lane];
+      for(int offset = 1; offset < num_warps; offset<<= 1) {
+        type_t y = subgroupShuffleDown(x, offset);
+        if(lane + offset < num_warps)
+          x = op(x, y);
+      }
+    }
+    __syncthreads();
+
+    return x;
+  }
+
+  template<int vt, typename op_t = std::plus<type_t> >
+  type_t reduce(std::array<type_t, vt> x, storage_t& shared, op_t op = op_t()) {
+    // Reduce within a thread.
+    @meta for(int i = 1; i < vt; ++i)
+      x[0] = op(x[0], x[i]);
+
+    // Reduce across threads.
+    return reduce(x[0], shared, op);
+  }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
 enum scan_type_t {
   scan_type_exc,
   scan_type_inc,
@@ -20,7 +76,6 @@ struct scan_result_t<type_t, vt, true> {
   std::array<type_t, vt> scan;
   type_t reduction;
 };
-
 
 template<int nt, typename type_t>
 struct cta_scan_t {

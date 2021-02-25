@@ -97,9 +97,14 @@ template<int nt, int vt, int vt0 = vt, typename type_t, typename it_t>
 void reg_to_mem_strided(std::array<type_t, vt> x, int tid, 
   int count, it_t mem) {
 
-  strided_iterate<nt, vt, vt0>([=](int i, int j) { 
-    mem[j] = x[i]; 
-  }, tid, count);
+  // strided_iterate<nt, vt, vt0>([=](int i, int j) { 
+  //   mem[j] = x[i]; 
+  // }, tid, count);
+  @meta for(int i = 0; i < vt; ++i) {{
+    int k = nt * i + tid;
+    if(k < count)
+      mem[k] = x[i];
+  }}
 }
 
 template<int nt, int vt, int vt0 = vt, typename it_t>
@@ -112,8 +117,11 @@ mem_to_reg_strided(it_t mem, int tid, int count) {
   //  x[i] = mem[j]; 
   //  }, tid, count);
 
-  @meta for(int i = 0; i < vt; ++i)
-    x[i] = mem[nt * i + tid];
+  @meta for(int i = 0; i < vt; ++i) {{
+    int k = nt * i + tid;
+    if(k < count)
+      x[i] = mem[k];
+  }}
 
   return x;
 }
