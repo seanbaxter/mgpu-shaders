@@ -18,9 +18,8 @@ void scan(cmd_buffer_t& cmd_buffer, memcache_t& cache,
   if(num_ctas <= 8) {
     // The small input pass. Perform the scan with a single CTA.
     launch<nt>(1, cmd_buffer, [=](int tid, int cta) {
-
-      // TODO: Edit compiler to flatten out top-level unions.
       typedef cta_scan_t<nt, int> scan_t;
+      
       __shared__ union {
         typename scan_t::storage_t scan;
         type_t values[nv];
@@ -36,7 +35,7 @@ void scan(cmd_buffer_t& cmd_buffer, memcache_t& cache,
         auto result = scan_t().scan(x, shared.scan, carry_in, init, op);
 
         // Store the scanned values back to global memory.
-        reg_to_mem_thread<nt, vt>(result.scan, tid, count - cur, data + cur, 
+        reg_to_mem_thread<nt>(result.scan, tid, count - cur, data + cur, 
           shared.values);
 
         carry_in = result.reduction;
@@ -97,7 +96,7 @@ void scan(cmd_buffer_t& cmd_buffer, memcache_t& cache,
       auto result = scan_t().scan(x, shared.scan, carry_in, init, op);
 
       // Store the scanned values back to global memory.
-      reg_to_mem_thread<nt, vt>(result.scan, tid, count - cur, data + cur, 
+      reg_to_mem_thread<nt>(result.scan, tid, count - cur, data + cur, 
         shared.values);
     });
   }

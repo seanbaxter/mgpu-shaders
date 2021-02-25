@@ -28,7 +28,7 @@ void kernel_blocksort(
   typedef cta_sort_t<nt, vt, key_t, val_t> sort_t;
   sort_t sort;
 
-  [[spirv::shared]] typename sort_t::storage_t shared;
+  __shared__ typename sort_t::storage_t shared;
 
   const int nv = nt * vt;
   int tid = threadIdx.x;
@@ -94,7 +94,7 @@ void kernel_mergesort_pass(
     key_t keys[nv + 1];
     int indices[nv];
   };
-  [[spirv::shared]] shared_t shared; 
+  __shared__ shared_t shared; 
 
   range_t tile = get_tile(cta, nv, count);
 

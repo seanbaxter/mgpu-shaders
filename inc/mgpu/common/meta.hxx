@@ -90,4 +90,30 @@ void thread_iterate(func_t f, int tid) {
     f(i, vt * tid + i);
 }
 
+template<int size> 
+struct integer_by_size_t;
+
+template<> struct integer_by_size_t<1> {
+  typedef  int8_t signed_type;
+  typedef uint8_t unsigned_type;
+};
+template<> struct integer_by_size_t<2> {
+  typedef  int16_t signed_type;
+  typedef uint16_t unsigned_type;
+};
+template<> struct integer_by_size_t<4> {
+  typedef  int32_t signed_type;
+  typedef uint32_t unsigned_type;
+};
+template<> struct integer_by_size_t<8> {
+  typedef  int64_t signed_type;
+  typedef uint64_t unsigned_type;
+};
+
+template<int size> 
+using signed_int_by_size_t = typename integer_by_size_t<size>::signed_type;
+
+template<int size> 
+using unsigned_int_by_size_t = typename integer_by_size_t<size>::unsigned_type;
+
 END_MGPU_NAMESPACE
