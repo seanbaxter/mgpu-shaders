@@ -20,7 +20,7 @@ int main() {
 
   // Generate test data.
   for(int i = 0; i < count; ++i)
-    host[i] = 1;
+    host[i] = i;
 
   // Create a command buffer.
   cmd_buffer_t cmd_buffer(context);
