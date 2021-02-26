@@ -74,7 +74,7 @@ struct cta_radix_rank_t {
     std::array<uint32_t, vt> indices;
 
     // The first num_bins threads return the corresponding digit count.
-    uint digit_count;
+    uint digit_scan;
   };
 
   union storage_t {
@@ -83,7 +83,61 @@ struct cta_radix_rank_t {
     typename scan_t::storage_t scan;
   };
 
-  // Return the scatter indices for all keys plus the cta-wide reduction for
+  // Return the cta-wide reduction for each digit in the first num_bins
+  // threads.
+  template<int vt>
+  uint reduce(std::array<uint, vt> x, storage_t& shared) {
+    int tid = glcomp_LocalInvocationID.x;
+
+    // Cooperatively zero out the histogram smem.
+    @meta for(int i = 0; i < num_slots; ++i)
+      shared.hist32[nt * i + tid] = 0;
+    __syncthreads();
+
+    // Compute the histogram for each thread. Not great for bank conflicts, but
+    // at least it's easy.
+    @meta for(int i = 0; i < vt; ++i)
+      ++shared.hist16[nt * x[i] + tid];
+    __syncthreads();
+
+    // Cooperatively scan the entire histogram. Each thread loads 9 words,
+    // which corresponds to 18 histogram slots. The odd grain size avoids
+    // smem bank conflicts on all architectures.
+    uint sum = 0;
+    uint counters[num_slots];
+    @meta for(int i = 0; i < num_slots; ++i) {
+      counters[i] = shared.hist32[num_slots * tid + i];
+      sum += counters[i];
+    }
+    __syncthreads();
+
+    // Scan the reductions. Use an inclusive scan since we want the reduction.
+    uint carry_in = scan_t().scan(sum, shared.scan).scan;
+    carry_in += (carry_in>> 16) | (carry_in<< 16);
+
+    // Write the scanned histogram back to shared memory.
+    @meta for(int i = 0; i < num_slots; ++i) {
+      // Add .low to .high
+      carry_in += counters[i]<< 16;
+      carry_in += counters[i] + (counters[i]>> 16);
+      shared.hist32[num_slots * tid + i] = carry_in;
+    }
+    __syncthreads();
+
+    // Get the digit totals. This is a maximally-conflicted operation.
+    uint digit_count = 0;
+    if(tid < num_bins) {
+      digit_count = shared.hist16[nt * tid + nt - 1];
+      int left = subgroupShuffleUp(digit_count, 1);
+      if(tid)
+        digit_count -= left;
+    }
+
+    __syncthreads();
+    return digit_count;
+  }
+
+  // Return the scatter indices for all keys plus the cta-wide scan for
   // each digit.
   template<int vt>
   result_t<vt> scatter(std::array<uint, vt> x, storage_t& shared) {
@@ -124,17 +178,17 @@ struct cta_radix_rank_t {
     }
     __syncthreads();
 
+    // Get the digit totals. This is a maximally-conflicted operation.
+    uint digit_scan = tid < num_bins ? shared.hist16[nt * tid] : 0;
+    __syncthreads();
+
     // Make a downsweep pass by counting the digits a second time.
     std::array<uint, vt> scatter;
     @meta for(int i = 0; i < vt; ++i)
       scatter[i] = shared.hist16[nt * x[i] + tid]++;
     __syncthreads();
 
-    // Get the digit totals. This is a maximally-conflicted operation.
-    uint digit_count = tid < num_bits ? shared.hist16[nt * tid + nt - 1] : 0;
-    __syncthreads();
-
-    return { scatter, digit_count };
+    return { scatter, digit_scan };
   }
 };
 
