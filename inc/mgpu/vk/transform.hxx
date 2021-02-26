@@ -5,8 +5,7 @@ BEGIN_MGPU_NAMESPACE
 
 namespace vk {
 
-// Launch a grid and pass (tid, gid)
-
+// Launch a grid and pass (tid, cta)
 template<int nt, typename func_t>
 [[using spirv: comp, local_size(nt), push]]
 void launch_cs(func_t func) {
@@ -18,6 +17,7 @@ static void launch(int num_blocks, cmd_buffer_t& cmd_buffer, func_t func) {
   launch_cs<nt><<<num_blocks, cmd_buffer>>>(func);
 }
 
+// Launch a grid and pass gid.
 template<int nt = 256, typename func_t>
 [[using spirv: comp, local_size(nt), push]]
 void transform_cs(int count, func_t func) {

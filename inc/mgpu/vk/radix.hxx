@@ -52,7 +52,7 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
         keys = shared_to_reg_thread<nt, vt>(shared.keys, tid);
 
         // Extract the digits for each key.
-        std::array<uint, vt> digits { 
+        std::array digits { 
           (uint)bitfieldExtract(keys...[:], bit, num_bits) ...
         };
 
@@ -82,9 +82,9 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
     int* partials = data + 2 * count; //cache.allocate<int>(num_bins * num_ctas);
 
     // Allocate a second buffer to ping-pong.
-    key_t* data2 = data + count; //cache.allocate<key_t>(count);
+    key_t* data2 = data + count;
 
-    for(int bit = 0; bit < 8 * sizeof(key_t); bit += num_bits) {
+    for(int bit = 0; bit < 32; bit += num_bits) {
       //////////////////////////////////////////////////////////////////////////
       // Upsweep.
 
@@ -95,16 +95,16 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
         } shared;
 
         int cur = nv * cta;
-        //data += cur;
-        // count -= cur;
+        data += cur;
+        count -= cur;
 
         // Load the data into strided order.
         std::array<unsigned_type, vt> keys;
         @meta for(int i = 0; i < vt; ++i) {{
           int offset = nt * i + tid;
-          if(offset < count - cur) {
+          if(offset < count) {
             // If the key is in range, load it and convert to radix bits.
-            keys[i] = radix_permute_t<key_t>::to_radix_bits(data[cur + offset]);
+            keys[i] = radix_permute_t<key_t>::to_radix_bits(data[offset]);
 
           } else {
             // Otherwise set all radix bits so this key is sorted to the end.
@@ -116,7 +116,7 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
         // strided order.
 
         // Extract the digits for each key.
-        std::array<uint, vt> digits { 
+        std::array digits { 
           (uint)bitfieldExtract(keys...[:], bit, num_bits) ...
         };
 
@@ -169,7 +169,7 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
         keys = shared_to_reg_thread<nt, vt>(shared.keys, tid);
 
         // Extract the digits for each key.
-        std::array<uint, vt> digits { 
+        std::array digits { 
           (uint)bitfieldExtract(keys...[:], bit, num_bits) ...
         };
 
@@ -210,8 +210,6 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
       });
 
       std::swap(data, data2);
-
-      break;
     }
   }
 }
