@@ -44,7 +44,7 @@ struct context_t {
       return 0x8000'0000 & usage;
     }
   };
-  typedef std::map<void*, buffer_t> buffer_map_t;
+  typedef std::map<const void*, buffer_t> buffer_map_t;
   typedef buffer_map_t::iterator buffer_it_t;
   buffer_map_t buffer_map;
   void* staging;
@@ -68,10 +68,10 @@ struct context_t {
   }
 
   void free(void* p);
-  buffer_it_t find_buffer(void* p);
+  buffer_it_t find_buffer(const void* p);
 
   // Copy between buffer memory. At least one operand must map to a buffer.
-  void memcpy(VkCommandBuffer cmd_buffer, void* dest, void* source, 
+  void memcpy(VkCommandBuffer cmd_buffer, void* dest, const void* source, 
     size_t size);
 
   std::map<const char*, VkShaderModule> modules;
@@ -96,11 +96,12 @@ struct cmd_buffer_t {
 
   operator VkCommandBuffer() { return vkCommandBuffer; }
 
+  void reset();
   void begin();
   void end();
   void submit();
   void host_barrier();
-  void memcpy(void* dest, void* source, size_t size);
+  void memcpy(void* dest, const void* source, size_t size);
 
   context_t& context;
   VkCommandBuffer vkCommandBuffer;

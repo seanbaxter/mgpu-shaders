@@ -211,7 +211,7 @@ void context_t::free(void* p) {
   buffer_map.erase(it);
 }
 
-context_t::buffer_it_t context_t::find_buffer(void* p) {
+context_t::buffer_it_t context_t::find_buffer(const void* p) {
   buffer_it_t it = buffer_map.lower_bound(p);
   if(buffer_map.end() != it) {
     // Check the range.
@@ -222,8 +222,8 @@ context_t::buffer_it_t context_t::find_buffer(void* p) {
   return it;
 }
 
-void context_t::memcpy(VkCommandBuffer cmd_buffer, void* dest, void* source, 
-  size_t size) {
+void context_t::memcpy(VkCommandBuffer cmd_buffer, void* dest,
+  const void* source, size_t size) {
 
   if(!size) return;
 
@@ -344,6 +344,8 @@ void context_t::submit(VkCommandBuffer cmd_buffer) {
   vkQueueSubmit(queue, 1, &submitInfo, 0);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 cmd_buffer_t::cmd_buffer_t(context_t& context) : context(context) { 
   VkCommandBufferAllocateInfo allocInfo {
     VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -358,6 +360,10 @@ cmd_buffer_t::cmd_buffer_t(context_t& context) : context(context) {
 cmd_buffer_t::~cmd_buffer_t() {
   vkFreeCommandBuffers(context.device, context.command_pool, 1, 
     &vkCommandBuffer);
+}
+
+void cmd_buffer_t::reset() {
+  vkResetCommandBuffer(vkCommandBuffer, 0);
 }
 
 void cmd_buffer_t::begin() {
@@ -393,7 +399,7 @@ void cmd_buffer_t::host_barrier() {
     0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
 }
 
-void cmd_buffer_t::memcpy(void* dest, void* source, size_t size) {
+void cmd_buffer_t::memcpy(void* dest, const void* source, size_t size) {
   context.memcpy(vkCommandBuffer, dest, source, size);
 }
 
