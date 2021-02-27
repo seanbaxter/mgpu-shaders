@@ -11,7 +11,7 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 9, nv = nt * vt };
+  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 10, nv = nt * vt };
 
   typedef uint type_t;
   int count = nt * vt;
@@ -48,7 +48,8 @@ int main() {
     shared.keys[result.indices...[:]] = x...[:] ...;
     __syncthreads();
 
-    mem_to_mem<nt, vt>(shared.keys, tid, count, gpu);
+    gpu[tid] = result.digit_scan;
+    // mem_to_mem<nt, vt>(shared.keys, tid, count, gpu);
   });
 
 
@@ -63,12 +64,11 @@ int main() {
   // And wait for it to be done.
   vkQueueWaitIdle(context.queue);
 
-  int total = 0;
-  for(int i = 0; i < count; ++i) {
-    total += host[i];
-    printf("%3d: %2d - %2d\n", i, host[i], hist[i]);
+  for(int i = 0; i < count; ++i) {   
+    printf("%3d: %3d\n", i, host[i]);
   }
-  printf("total = %d\n", total);
+  for(int i = 0; i < num_bins; ++i)
+    printf("%3d: %3d\n", i, hist[i]);
 
   context.free(host);
   context.free(gpu);

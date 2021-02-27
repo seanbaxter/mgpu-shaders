@@ -296,7 +296,7 @@ struct cta_radix_rank_ballot_t {
 
     // Process each digit.
     uint matches[vt];
-    @meta for(int i = 0; i < vt; ++i) {{
+    @meta for(int i = 0; i < vt; ++i) {
       // Get a bitfield of lanes with matching digits.
       matches[i] = get_matching_lanes(x[i]);
 
@@ -304,26 +304,25 @@ struct cta_radix_rank_ballot_t {
       // Only the lowest lane in the match mask does this.
       if(0 == (gl_SubgroupLtMask & matches[i]))
         shared.hist32[warp][x[i]] += bitCount(matches[i]);
-    }}
+    }
     __syncthreads();
 
-    // NOTE HOW WARP DIGITS MUST BE INTERLEAVED?
-
+    uint digit_scan = 0;
     if(tid < num_bins) {
       // Reduce the digit counts over the warps and keep a copy of the 
       // counters.
       uint counters[num_warps];
-      uint digit_count = 0;
       @meta for(int warp = 0; warp < num_warps; ++warp)
-        digit_count += counters[warp] = shared.hist32[warp][tid];
+        digit_scan += counters[warp] = shared.hist32[warp][tid];
 
       // Do a cooperative CTA scan.
-      uint scan = scan_t().scan(digit_count, shared.scan).scan;
+      digit_scan = scan_t().scan(digit_scan, shared.scan).scan;
+      uint scatter = digit_scan;
 
       // Add back into the warp counters.
       @meta for(int warp = 0; warp < num_warps; ++warp) { 
-        shared.hist32[warp][tid] = scan;
-        scan += counters[warp];
+        shared.hist32[warp][tid] = scatter;
+        scatter += counters[warp];
       }
     }
     __syncthreads();
@@ -338,7 +337,7 @@ struct cta_radix_rank_ballot_t {
     }}
     __syncthreads();
 
-    return { scatter, 0 };
+    return { scatter, digit_scan };
   }
 };
 
