@@ -116,4 +116,11 @@ using signed_int_by_size_t = typename integer_by_size_t<size>::signed_type;
 template<int size> 
 using unsigned_int_by_size_t = typename integer_by_size_t<size>::unsigned_type;
 
+template<typename type_t>
+type_t* advance_pointer(void*& p, size_t count) {
+  type_t* p2 = (type_t*)p;
+  p = p2 + count;
+  return p2;
+}
+
 END_MGPU_NAMESPACE

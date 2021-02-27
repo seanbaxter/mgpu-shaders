@@ -9,9 +9,9 @@ namespace vk {
 ////////////////////////////////////////////////////////////////////////////////
 // Multiple radix sort passes.
 
-template<int nt, int vt, int num_bits = 4, typename key_t>
-void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
-  int count) {
+template<int nt = 128, int vt = 15, int num_bits = 4, typename key_t>
+void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer, 
+  key_t* data, int count) {
 
   enum { nv = nt * vt, num_bins = 1<< num_bits };
   typedef unsigned_int_by_size_t<sizeof(key_t)> unsigned_type;
@@ -20,6 +20,8 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
   int num_ctas = div_up(count, nv);
 
   if(1 == num_ctas) {
+    if(!aux_data) return;
+
     ////////////////////////////////////////////////////////////////////////////
     // Fully radix sort data within a CTA.
 
@@ -78,13 +80,21 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
     ////////////////////////////////////////////////////////////////////////////
     // Make multiple passes to sort the input.
 
+    if(!aux_data) {
+      aux_size += sizeof(uint) * num_bins * num_ctas;
+      aux_size += sizeof(key_t) * count;
+      scan(nullptr, aux_size, cmd_buffer, (uint*)nullptr, num_bins * num_ctas);
+      return;
+    }
+
     // Allocate space for each digit count.
-    int* partials = data + 2 * count; //cache.allocate<int>(num_bins * num_ctas);
+    uint* partials = advance_pointer<uint>(aux_data, num_bins * num_ctas);
 
     // Allocate a second buffer to ping-pong.
-    key_t* data2 = data + count;
+    key_t* data2 = advance_pointer<key_t>(aux_data, count);
 
-    for(int bit = 0; bit < 32; bit += num_bits) {
+    for(int bit = 0; bit < 8 * sizeof(key_t); bit += num_bits) {
+
       //////////////////////////////////////////////////////////////////////////
       // Upsweep.
 
@@ -131,7 +141,7 @@ void radix_sort(cmd_buffer_t& cmd_buffer, memcache_t& cache, key_t* data,
       //////////////////////////////////////////////////////////////////////////
       // Scan.
 
-      scan(cmd_buffer, cache, partials, num_bins * num_ctas);
+      scan(aux_data, aux_size, cmd_buffer, partials, num_bins * num_ctas);
 
       //////////////////////////////////////////////////////////////////////////
       // Downsweep.

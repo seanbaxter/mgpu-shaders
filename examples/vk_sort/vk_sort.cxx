@@ -23,8 +23,12 @@ int main() {
   cmd_buffer.host_barrier();
 
   // Execute the parallel mergesort.
-  memcache_t cache(context);
-  mergesort_keys(cmd_buffer, cache, gpu, count);
+  void* aux_data = nullptr;
+  size_t aux_size = 0;
+  mergesort_keys(aux_data, aux_size, cmd_buffer, gpu, count);
+  aux_data = context.alloc_gpu(aux_size);
+
+  mergesort_keys(aux_data, aux_size, cmd_buffer, gpu, count);
 
   // Retrieve the results.
   cmd_buffer.memcpy(host, gpu, sizeof(float) * count);
@@ -40,6 +44,7 @@ int main() {
   for(int i = 0; i < count; ++i)
     printf("%5d: %f\n", i, host[i]);
 
+  context.free(aux_data);
   context.free(host);
   context.free(gpu);
 }

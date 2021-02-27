@@ -14,7 +14,7 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  int count = 128 * 7 * 10; 
+  int count = 10000;
   int* host = context.alloc_cpu<int>(count);
   int* gpu  = context.alloc_gpu<int>(count);
 
@@ -31,8 +31,13 @@ int main() {
   cmd_buffer.host_barrier();
 
   // Execute the scan.
-  memcache_t cache(context);
-  vk::scan(cmd_buffer, cache, gpu, count);
+  void* aux_data = nullptr;
+  size_t aux_size = 0;
+  vk::scan(aux_data, aux_size, cmd_buffer, gpu, count);
+  printf("aux size = %ld\n", aux_size);
+  aux_data = context.alloc_gpu(aux_size);
+
+  vk::scan(aux_data, aux_size, cmd_buffer, gpu, count);
 
   // Retrieve the results.
   cmd_buffer.memcpy(host, gpu, sizeof(int) * count);
@@ -48,6 +53,7 @@ int main() {
   for(int i = 0; i < count; ++i)
     printf("%3d: %2d\n", i, host[i]);
 
+  context.free(aux_data);
   context.free(host);
   context.free(gpu);
 

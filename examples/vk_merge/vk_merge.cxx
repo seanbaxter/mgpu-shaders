@@ -38,8 +38,13 @@ int main() {
   cmd_buffer.host_barrier();
 
   // Execute the parallel merge.
-  memcache_t memcache(context);
-  merge(cmd_buffer, memcache, a_gpu, a_count, b_gpu, b_count, c_gpu, 
+  void* aux_data = nullptr;
+  size_t aux_size = 0;
+  merge(aux_data, aux_size, cmd_buffer, a_gpu, a_count, b_gpu, b_count, c_gpu, 
+    std::less<float>());
+  aux_data = context.alloc_gpu(aux_size);
+
+  merge(aux_data, aux_size, cmd_buffer, a_gpu, a_count, b_gpu, b_count, c_gpu, 
     std::less<float>());
 
   // Retrieve the results.
@@ -56,6 +61,7 @@ int main() {
   for(int i = 0; i < count; ++i)
     printf("%5d: %f\n", i, c_host[i]);
 
+  context.free(aux_data);
   context.free(a_host);
   context.free(b_host);
   context.free(c_host);

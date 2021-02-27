@@ -66,12 +66,12 @@ struct radix_permute_t {
 template<int nt, int num_bits = 4>
 struct cta_radix_rank_t {
   enum { num_bins = 1<< num_bits, num_slots = num_bins / 2 + 1 };
-  typedef cta_scan_t<nt, uint32_t> scan_t;
+  typedef cta_scan_t<nt, uint> scan_t;
 
   template<int vt>
   struct result_t {
     // All threads return scatter indices for each value.
-    std::array<uint32_t, vt> indices;
+    std::array<uint, vt> indices;
 
     // The first num_bins threads return the corresponding digit count.
     uint digit_scan;
@@ -111,7 +111,7 @@ struct cta_radix_rank_t {
     }
     __syncthreads();
 
-    // Scan the reductions. Use an inclusive scan since we want the reduction.
+    // Scan the reductions.
     uint carry_in = scan_t().scan(sum, shared.scan).scan;
     carry_in += (carry_in>> 16) | (carry_in<< 16);
 

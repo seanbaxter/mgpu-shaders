@@ -9,16 +9,21 @@ namespace vk {
 
 template<int nt = 128, int vt = 7, typename type_t,
   typename op_t = std::plus<type_t> >
-void scan(cmd_buffer_t& cmd_buffer, memcache_t& cache,
+void scan(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer, 
   type_t* data, int count, type_t init = type_t(), op_t op = op_t()) {
 
   enum { nv = nt * vt };
   int num_ctas = div_up(count, nv);
 
   if(num_ctas <= 8) {
+    if(!aux_data) {
+      // Require no aux bytes, so return immediately.
+      return;
+    }
+
     // The small input pass. Perform the scan with a single CTA.
     launch<nt>(1, cmd_buffer, [=](int tid, int cta) {
-      typedef cta_scan_t<nt, int> scan_t;
+      typedef cta_scan_t<nt, type_t> scan_t;
       
       __shared__ union {
         typename scan_t::storage_t scan;
@@ -46,8 +51,15 @@ void scan(cmd_buffer_t& cmd_buffer, memcache_t& cache,
     // The recursive kernel.
     int num_passes = find_log2(num_ctas, true);
 
+    if(!aux_data) {
+      // Allocate space for one reduction per tile.
+      aux_size += sizeof(type_t) * num_ctas;
+      scan(nullptr, aux_size, cmd_buffer, data, num_ctas, init, op);
+      return;
+    }
+
     // Allocate space for one reduction per tile.
-    type_t* partials = cache.allocate<type_t>(num_ctas);
+    type_t* partials = advance_pointer<type_t>(aux_data, num_ctas);
 
     // The upsweep reduces each tile into partials.
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {
@@ -72,7 +84,7 @@ void scan(cmd_buffer_t& cmd_buffer, memcache_t& cache,
     });
 
     // Recursively scan the partials.
-    scan<nt, vt>(cmd_buffer, cache, partials, num_ctas, init, op);
+    scan<nt, vt>(aux_data, aux_size, cmd_buffer, partials, num_ctas, init, op);
 
     // The downsweep performs a scan with carry-in.
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {

@@ -9,7 +9,8 @@ namespace vk {
 
 template<int nt = 128, int vt = 7, bool sort_indices = false, 
   typename key_t, typename val_t, typename comp_t = std::less<key_t> >
-void mergesort_kv(cmd_buffer_t& cmd_buffer, memcache_t& cache, 
+void mergesort_kv(
+  void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
   key_t* keys, val_t* vals, int count, comp_t comp = comp_t()) {
 
   static_assert(!sort_indices || std::is_same_v<int, val_t>);
@@ -19,6 +20,8 @@ void mergesort_kv(cmd_buffer_t& cmd_buffer, memcache_t& cache,
   int num_passes = find_log2(num_ctas, true);
 
   if(0 == num_passes) {
+    if(!aux_data) return;
+
     // For a single CTA, sort in place and don't require any cache memory.
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {
       kernel_blocksort<sort_indices, nt, vt>(keys, vals, keys, vals, 
@@ -29,17 +32,17 @@ void mergesort_kv(cmd_buffer_t& cmd_buffer, memcache_t& cache,
     int num_partitions = num_ctas + 1;
 
     // Allocate temporary storage for the partitions and ping-pong buffers.
-    const size_t sizes[] {
-      sizeof(int) * num_partitions,
-      sizeof(key_t) * count,
-      has_values ? sizeof(val_t) * count : 0ul
-    };
-    void* allocations[3];
-    cache.allocate(sizes, 3, allocations);
+    if(!aux_data) {
+      aux_size += sizeof(int) * num_partitions;
+      aux_size += sizeof(key_t) * count;
+      if(has_values)
+        aux_size += sizeof(val_t) * count;
+      return;
+    }
 
-    int* mp = (int*)allocations[0];
-    key_t* keys2 = (key_t*)allocations[1];
-    val_t* vals2 = (val_t*)allocations[2];
+    int* mp = advance_pointer<int>(aux_data, num_partitions);
+    key_t* keys2 = advance_pointer<key_t>(aux_data, count);
+    val_t* vals2 = advance_pointer<val_t>(aux_data, count);
 
     key_t* keys_blocksort = (1 & num_passes) ? keys2 : keys;
     val_t* vals_blocksort = (1 & num_passes) ? vals2 : vals;
@@ -82,19 +85,21 @@ void mergesort_kv(cmd_buffer_t& cmd_buffer, memcache_t& cache,
 
 template<int nt = 128, int vt = 7, typename key_t,
   typename comp_t = std::less<key_t> >
-void mergesort_keys(cmd_buffer_t& cmd_buffer, memcache_t& cache, 
+void mergesort_keys(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
   key_t* keys, int count, comp_t comp = comp_t()) {
 
-  mergesort_kv<nt, vt, false>(cmd_buffer, cache, keys, (empty_t*)nullptr, 
-    count, comp);
+  mergesort_kv<nt, vt, false>(aux_data, aux_size, cmd_buffer, keys, 
+    (empty_t*)nullptr, count, comp);
 }
 
 template<int nt = 128, int vt = 7, typename key_t,
   typename comp_t = std::less<key_t> >
-void mergesort_indices(cmd_buffer_t& cmd_buffer, memcache_t& cache, 
-  key_t* keys, int* indices, int count, comp_t comp = comp_t()) {
+void mergesort_indices(void* aux_data, size_t& aux_size, 
+  cmd_buffer_t& cmd_buffer, key_t* keys, int* indices, int count, 
+  comp_t comp = comp_t()) {
 
-  mergesort_kv<nt, vt, true>(cmd_buffer, cache, keys, indices, count, comp);
+  mergesort_kv<nt, vt, true>(aux_data, aux_size, cmd_buffer, keys, indices,
+    count, comp);
 }
 
 } // namespace vk

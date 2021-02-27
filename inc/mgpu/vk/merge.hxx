@@ -17,7 +17,7 @@ template<
   typename comp_t
 >
 void merge(
-  cmd_buffer_t& cmd_buffer, memcache_t& cache,
+  void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer, 
   a_keys_it a_keys, a_vals_it a_vals, int a_count, 
   b_keys_it b_keys, b_vals_it b_vals, int b_count,
   c_keys_it c_keys, c_vals_it c_vals, comp_t comp) {
@@ -27,7 +27,13 @@ void merge(
   constexpr int nv = nt * vt;
 
   int num_partitions = num_merge_partitions(a_count + b_count, nv);
-  int* partitions = cache.allocate<int>(num_partitions);
+  if(!aux_data) {
+    // Use 1 int per partition.
+    aux_size += sizeof(int) * num_partitions;
+    return;
+  }
+
+  int* partitions = advance_pointer<int>(aux_data, num_partitions);
 
   merge_path_partitions<bounds_lower>(cmd_buffer, a_keys, a_count, 
     b_keys, b_count, partitions, nv, comp);
@@ -43,11 +49,13 @@ void merge(
 template<int nt = 128, int vt = 7,
   typename a_keys_it, typename b_keys_it, typename c_keys_it,
   typename comp_t>
-void merge(cmd_buffer_t& cmd_buffer, memcache_t& cache, a_keys_it a_keys, 
-  int a_count, b_keys_it b_keys, int b_count, c_keys_it c_keys, comp_t comp) {
+void merge(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
+  a_keys_it a_keys, int a_count, b_keys_it b_keys, int b_count, 
+  c_keys_it c_keys, comp_t comp) {
 
-  merge<nt, vt>(cmd_buffer, cache, a_keys, (const empty_t*)nullptr, a_count, 
-    b_keys, (const empty_t*)nullptr, b_count, c_keys, (empty_t*)nullptr, comp);
+  merge<nt, vt>(aux_data, aux_size, cmd_buffer, a_keys, 
+    (const empty_t*)nullptr, a_count, b_keys, (const empty_t*)nullptr, 
+    b_count, c_keys, (empty_t*)nullptr, comp);
 }
 
 } // namespace vk
