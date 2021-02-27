@@ -146,12 +146,11 @@ struct cta_scan_t {
 
     int tid = glcomp_LocalInvocationID.x;
 
-    // Start with an inclusive scan of the in-range elements.
-    @meta for(int i = 1; i < vt; ++i)
-      x[i] = op(x[i - 1], x[i]);
+    // Reduce the inputs and scan them.
+    type_t sum = (... + x...[:]);
 
     // Scan the thread-local reductions for a carry-in for each thread.
-    scan_result_t<type_t> result = scan(x[vt - 1], shared, init, op);
+    scan_result_t<type_t> result = scan(sum, shared, init, op);
 
     // Perform the scan downsweep and add both global carry-in and the thread
     // carry-in to the values.
@@ -159,9 +158,11 @@ struct cta_scan_t {
     result.scan = op(carry_in, result.scan);
 
     if constexpr(scan_type_exc == scan_type) {
-      @meta for(int i = vt - 1; i > 0; --i)
-        x[i] = op(result.scan, x[i - 1]);
-      x[0] = result.scan;
+      @meta for(int i = 0; i < vt; ++i) {
+        type_t temp = x[i];
+        x[i] = result.scan;
+        result.scan += temp;
+      }
 
     } else {
       // Add the carry-in.

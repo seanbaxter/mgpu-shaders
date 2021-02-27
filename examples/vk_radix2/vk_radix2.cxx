@@ -11,17 +11,21 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  enum { nt = 256, num_bits = 4, num_bins = 1<< num_bits, vt = 16, nv = nt * vt };
+  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 10, nv = nt * vt };
 
   typedef uint type_t;
   int count = nt * vt;
+  std::vector<uint> ref(count);
+
   type_t* host = context.alloc_cpu<type_t>(count);
   type_t* gpu  = context.alloc_gpu<type_t>(count);
 
   // Generate test data.
   for(int i = 0; i < count; ++i) {
-    host[i] = rand();
+    ref[i] = host[i] = rand();
   }
+ // std::sort(ref.begin(), ref.begin() + 32);
+ // std::sort(ref.begin() + 32, ref.begin() + 64);
 
   // Create a command buffer.
   cmd_buffer_t cmd_buffer(context);
@@ -49,10 +53,8 @@ int main() {
   // And wait for it to be done.
   vkQueueWaitIdle(context.queue);
 
-  int target[num_bins];
-  target...[:] = -1 ...;
   for(int i = 0; i < count; ++i) {
-    printf("%3d: 0x%08x\n", i, host[i]);
+    printf("%3d: %3d\n", i, host[i]); // - %3d - %3d\n", i, host[i], ref[i], scans[i / 32][i % 32]);
     uint a = host[std::max(0, i - 1)];
     uint b = host[i];
     if(a > b) {
@@ -60,6 +62,7 @@ int main() {
       exit(1);
     }
   }
+  
 
   // context.free(aux_data);
   context.free(host);

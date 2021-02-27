@@ -310,45 +310,46 @@ struct cta_radix_rank_t<nt, num_bits, radix_rank_ballot> {
       // Get a bitfield of lanes with matching digits.
       matches[i] = get_matching_lanes(x[i]);
 
+      // TODO: Confirm that removing the check makes it faster not slower.
+
       // Increment the histogram bin to indicate the digit count.
       // Only the lowest lane in the match mask does this.
-      //if(0 == (gl_SubgroupLtMask & matches[i]))
+    //  if(0 == (gl_SubgroupLtMask & matches[i]))
         shared.hist32[warp][x[i]] += bitCount(matches[i]);
     }
     __syncthreads();
 
-    uint digit_scan = 0;
+
+    std::array<uint, num_warps> counters;
     if(tid < num_bins) {
       // Reduce the digit counts over the warps and keep a copy of the 
       // counters.
-      uint counters[num_warps];
-      @meta for(int warp = 0; warp < num_warps; ++warp)
-        digit_scan += counters[warp] = shared.hist32[warp][tid];
-      __syncthreads();
-
-      // Do a cooperative CTA scan.
-      digit_scan = scan_t().scan(digit_scan, shared.scan).scan;
-
-      // Add back into the warp counters.
-      uint scatter = digit_scan;
-      @meta for(int warp = 0; warp < num_warps; ++warp) { 
-        shared.hist32[warp][tid] = scatter;
-        scatter += counters[warp];
-      }
+      @meta for(int i = 0; i < num_warps; ++i)
+        counters[i] = shared.hist32[i][tid];
     }
     __syncthreads();
 
+    // Do a cooperative CTA scan.
+    auto result = scan_t().scan(counters, shared.scan);
+
+    if(tid < num_bins) {
+      // Add back into the warp counters.
+      @meta for(int i = 0; i < num_warps; ++i)
+        shared.hist32[i][tid] = result.scan[i];
+    } 
+    __syncthreads();
+  
     // Make a second pass and compute scatter indices.
     std::array<uint, vt> scatter;
     @meta for(int i = 0; i < vt; ++i) {{
       uint lower_mask = gl_SubgroupLtMask.x & matches[i];
       scatter[i] = shared.hist32[warp][x[i]] + bitCount(lower_mask);
-      //if(!lower_mask)
-        shared.hist32[warp][x[i]] += bitCount(matches[i]);
+      if(!lower_mask)
+        shared.hist32[warp][x[i]] = scatter[i] + bitCount(matches[i]);
     }}
     __syncthreads();
 
-    return { scatter, digit_scan };
+    return { scatter, result.reduction };
   }
 };
 

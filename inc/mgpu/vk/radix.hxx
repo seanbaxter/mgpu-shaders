@@ -72,7 +72,7 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
       // Move the keys into shared memory.
       reg_to_shared_strided<nt>(keys, tid, shared.keys);
 
-      for(int bit = 0; bit < 8 * sizeof(key_t); bit += num_bits) {
+      @meta for(int bit = 0; bit < 8 * sizeof(num_bits); bit += num_bits) {
         // Load the keys from shared memory.
         if constexpr(true)
           keys = shared_to_reg_warp<nt, vt>(shared.keys, lane, warp, warp_size);
@@ -105,7 +105,7 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
   } else {
     ////////////////////////////////////////////////////////////////////////////
     // Make multiple passes to sort the input.
-
+#if 0
     if(!aux_data) {
       aux_size += sizeof(uint) * num_bins * num_ctas;
       aux_size += sizeof(key_t) * count;
@@ -247,6 +247,7 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
 
       std::swap(data, data2);
     }
+      #endif
   }
 }
 
