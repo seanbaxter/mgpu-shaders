@@ -11,7 +11,7 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 16, nv = nt * vt };
+  enum { nt = 256, num_bits = 4, num_bins = 1<< num_bits, vt = 16, nv = nt * vt };
 
   typedef uint type_t;
   int count = nt * vt;
