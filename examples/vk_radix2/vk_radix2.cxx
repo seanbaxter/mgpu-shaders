@@ -11,19 +11,16 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 10, nv = nt * vt };
+  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 16, nv = nt * vt };
 
   typedef uint type_t;
   int count = nt * vt;
   type_t* host = context.alloc_cpu<type_t>(count);
   type_t* gpu  = context.alloc_gpu<type_t>(count);
 
-  int hist[num_bins] { };
-
   // Generate test data.
   for(int i = 0; i < count; ++i) {
-    host[i] = rand() % num_bins;
-    hist[host[i]]++;
+    host[i] = rand();
   }
 
   // Create a command buffer.
@@ -34,24 +31,12 @@ int main() {
   cmd_buffer.memcpy(gpu, host, sizeof(type_t) * count);
   cmd_buffer.host_barrier();
 
-  launch<nt>(1, cmd_buffer, [=](int tid, int cta) {
-    typedef cta_radix_rank_ballot_t<nt, num_bits> radix_t;
-    __shared__ union {
-      typename radix_t::storage_t radix;
-      type_t keys[nv];
-    } shared;
+  void* aux_data = nullptr;
+  size_t aux_size = 0;
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
+  aux_data = context.alloc_gpu(aux_size);
 
-    std::array<uint, vt> x = mem_to_reg_thread<nt, vt>(gpu, tid, count,
-      shared.keys);
-
-    auto result = radix_t().scatter(x, shared.radix);
-    shared.keys[result.indices...[:]] = x...[:] ...;
-    __syncthreads();
-
-    gpu[tid] = result.digit_scan;
-    // mem_to_mem<nt, vt>(shared.keys, tid, count, gpu);
-  });
-
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
 
   // Retrieve the results.
   cmd_buffer.memcpy(host, gpu, sizeof(type_t) * count);
@@ -64,12 +49,19 @@ int main() {
   // And wait for it to be done.
   vkQueueWaitIdle(context.queue);
 
-  for(int i = 0; i < count; ++i) {   
-    printf("%3d: %3d\n", i, host[i]);
+  int target[num_bins];
+  target...[:] = -1 ...;
+  for(int i = 0; i < count; ++i) {
+    printf("%3d: 0x%08x\n", i, host[i]);
+    uint a = host[std::max(0, i - 1)];
+    uint b = host[i];
+    if(a > b) {
+      printf("Error at %d: %d vs %d\n", i - 1, a, b);
+      exit(1);
+    }
   }
-  for(int i = 0; i < num_bins; ++i)
-    printf("%3d: %3d\n", i, hist[i]);
 
+  // context.free(aux_data);
   context.free(host);
   context.free(gpu);
 

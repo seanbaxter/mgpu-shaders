@@ -39,6 +39,8 @@ std::array<type_t, vt> shared_to_reg_thread(
   return x;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 template<int nt, int vt, typename type_t, int shared_size>
 void reg_to_shared_strided(std::array<type_t, vt> x, int tid,
   type_t (&shared)[shared_size], bool sync = true) {
@@ -67,6 +69,23 @@ std::array<type_t, vt> shared_to_reg_strided(
   return x;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+template<int nt, int vt, typename type_t, int shared_size>
+std::array<type_t, vt> shared_to_reg_warp(const type_t (&shared)[shared_size],
+  int lane, int warp, int warp_size, bool sync = true) {
+
+  uint cur = vt * warp_size * warp + lane;
+
+  std::array<type_t, vt> x;
+  @meta for(int i = 0; i < vt; ++i)
+    x[i] = shared[cur + i * warp_size];
+  if(sync) __syncthreads();
+  return x;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 template<int nt, int vt, typename type_t, int shared_size>
 std::array<type_t, vt> shared_gather(const type_t(&data)[shared_size],
   std::array<int, vt> indices, bool sync = true) {
@@ -74,8 +93,7 @@ std::array<type_t, vt> shared_gather(const type_t(&data)[shared_size],
   static_assert(shared_size >= nt * vt,
     "shared_gather must have at least nt * vt storage");
 
-  std::array<type_t, vt> x;
-  iterate<vt>([&](int i) { x[i] = data[indices[i]]; });
+  std::array<type_t, vt> x { data[indices...[:]]... };
   if(sync) __syncthreads();
   return x;
 }

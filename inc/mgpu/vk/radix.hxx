@@ -7,9 +7,28 @@ BEGIN_MGPU_NAMESPACE
 namespace vk {
 
 ////////////////////////////////////////////////////////////////////////////////
+// Scan counters for all bins. This avoids having to scatter into a single
+// ordered array, which becomes inefficient as num_bins becomes large.
+
+template<int nt, int vt, int num_bits>
+void radix_rank_scan(void* aux_data, size_t& aux_size, 
+  cmd_buffer_t& cmd_buffer, uint* counts, int num_frames) {
+
+  enum { num_bins = 1<< num_bits, nv = nt * vt };
+  int num_ctas = div_up(num_frames * num_bins, nv);
+
+  if(num_ctas < 8) {
+
+  } else {
+
+  }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Multiple radix sort passes.
 
-template<int nt = 128, int vt = 15, int num_bits = 4, typename key_t>
+template<int nt = 128, int vt = 15, int num_bits = 8, typename key_t>
 void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer, 
   key_t* data, int count) {
 
@@ -26,11 +45,15 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
     // Fully radix sort data within a CTA.
 
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {
-      typedef cta_radix_rank_t<nt, num_bits> radix_t;
+      typedef cta_radix_rank_t<nt, num_bits, radix_rank_ballot> radix_t;
       __shared__ union {
         typename radix_t::storage_t radix;
         unsigned_type keys[nv];
       } shared;
+
+      int lane = gl_SubgroupInvocationID;
+      int warp = gl_SubgroupID;
+      int warp_size = gl_SubgroupSize;
 
       // Load the data into strided order.
       std::array<unsigned_type, vt> keys;
@@ -51,7 +74,10 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
 
       for(int bit = 0; bit < 8 * sizeof(key_t); bit += num_bits) {
         // Load the keys from shared memory.
-        keys = shared_to_reg_thread<nt, vt>(shared.keys, tid);
+        if constexpr(true)
+          keys = shared_to_reg_warp<nt, vt>(shared.keys, lane, warp, warp_size);
+        else
+          keys = shared_to_reg_thread<nt, vt>(shared.keys, tid);
 
         // Extract the digits for each key.
         std::array digits { 
@@ -147,7 +173,7 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
       // Downsweep.
 
       launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) mutable {
-        typedef cta_radix_rank_t<nt, num_bits> radix_t;
+        typedef cta_radix_rank_t<nt, num_bits, radix_rank_ballot> radix_t;
         __shared__ union {
           typename radix_t::storage_t radix;
           unsigned_type keys[nv];
@@ -223,6 +249,10 @@ void radix_sort(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
     }
   }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+
 
 } // namespace vk
 
