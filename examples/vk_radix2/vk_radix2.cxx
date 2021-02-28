@@ -11,10 +11,11 @@ int main() {
   context_t context;
 
   // Allocate test data storage.
-  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 10, nv = nt * vt };
+  enum { nt = 256, num_bits = 8, num_bins = 1<< num_bits, vt = 1, nv = nt * vt };
 
   typedef uint type_t;
-  int count = nt * vt;
+  int count = nv * 32 * 32 * 32;
+  int num_ctas = div_up(count, nv);
   std::vector<uint> ref(count);
 
   type_t* host = context.alloc_cpu<type_t>(count);
@@ -24,8 +25,11 @@ int main() {
   for(int i = 0; i < count; ++i) {
     ref[i] = host[i] = rand();
   }
- // std::sort(ref.begin(), ref.begin() + 32);
- // std::sort(ref.begin() + 32, ref.begin() + 64);
+
+  //for(int i = 0; i < count; i += nv) {
+  //  std::sort(ref.begin() + i, ref.begin() + std::min(count, i + nv));
+  //}
+  std::sort(ref.begin(), ref.end());
 
   // Create a command buffer.
   cmd_buffer_t cmd_buffer(context);
@@ -41,6 +45,11 @@ int main() {
   aux_data = context.alloc_gpu(aux_size);
 
   radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
+  radix_sort<nt, vt, num_bits>(aux_data, aux_size, cmd_buffer, gpu, count);
 
   // Retrieve the results.
   cmd_buffer.memcpy(host, gpu, sizeof(type_t) * count);
@@ -54,17 +63,19 @@ int main() {
   vkQueueWaitIdle(context.queue);
 
   for(int i = 0; i < count; ++i) {
-    printf("%3d: %3d\n", i, host[i]); // - %3d - %3d\n", i, host[i], ref[i], scans[i / 32][i % 32]);
-    uint a = host[std::max(0, i - 1)];
-    uint b = host[i];
-    if(a > b) {
-      printf("Error at %d: %d vs %d\n", i - 1, a, b);
-      exit(1);
-    }
+  //  printf("%6d: %9d\n", i, host[i]); // - %3d - %3d\n", i, host[i], ref[i], scans[i / 32][i % 32]);
+  //  printf("%3d: %5d \n", i, host[i]);
+
+   if(host[i] != ref[i]) {
+     printf("Error at %d: %d vs %d\n", i, host[i], ref[i]);
+     exit(1);
+   }
   }
+
+  printf("MATCH\n");
   
 
-  // context.free(aux_data);
+  context.free(aux_data);
   context.free(host);
   context.free(gpu);
 

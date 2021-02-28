@@ -65,19 +65,19 @@ struct radix_permute_t {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-enum radix_rank_kind_t {
-  radix_rank_shared,
-  radix_rank_ballot,
+enum radix_kind_t {
+  radix_kind_shared,
+  radix_kind_ballot,
 };
 
-template<int nt, int num_bits, radix_rank_kind_t rank_kind = radix_rank_shared>
+template<int nt, int num_bits, radix_kind_t rank_kind = radix_kind_shared>
 struct cta_radix_rank_t;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Use shared memory histogram to rank digits.
 
 template<int nt, int num_bits>
-struct cta_radix_rank_t<nt, num_bits, radix_rank_shared> {
+struct cta_radix_rank_t<nt, num_bits, radix_kind_shared> {
   enum { num_bins = 1<< num_bits, num_slots = num_bins / 2 + 1 };
   typedef cta_scan_t<nt, uint> scan_t;
 
@@ -210,7 +210,7 @@ struct cta_radix_rank_t<nt, num_bits, radix_rank_shared> {
 // 32-lane subgroups.
 
 template<int nt, int num_bits>
-struct cta_radix_rank_t<nt, num_bits, radix_rank_ballot> {
+struct cta_radix_rank_t<nt, num_bits, radix_kind_ballot> {
   enum { 
     num_bins = 1<< num_bits,
     warp_size = 32,
@@ -282,8 +282,8 @@ struct cta_radix_rank_t<nt, num_bits, radix_rank_ballot> {
     // Do a digit-wise reduction across warps.
     int digit_count = 0;
     if(tid < num_bins) {
-      @meta for(int warp = 0; warp < num_warps; ++warp)
-        digit_count += shared.hist32[warp][tid];
+      @meta for(int i = 0; i < num_warps; ++i)
+        digit_count += shared.hist32[i][tid];
     }
     __syncthreads();
 
@@ -309,16 +309,10 @@ struct cta_radix_rank_t<nt, num_bits, radix_rank_ballot> {
     @meta for(int i = 0; i < vt; ++i) {
       // Get a bitfield of lanes with matching digits.
       matches[i] = get_matching_lanes(x[i]);
-
-      // TODO: Confirm that removing the check makes it faster not slower.
-
-      // Increment the histogram bin to indicate the digit count.
-      // Only the lowest lane in the match mask does this.
-    //  if(0 == (gl_SubgroupLtMask & matches[i]))
+      if(0 == (gl_SubgroupLtMask & matches[i]))
         shared.hist32[warp][x[i]] += bitCount(matches[i]);
     }
     __syncthreads();
-
 
     std::array<uint, num_warps> counters;
     if(tid < num_bins) {
@@ -332,8 +326,10 @@ struct cta_radix_rank_t<nt, num_bits, radix_rank_ballot> {
     // Do a cooperative CTA scan.
     auto result = scan_t().scan(counters, shared.scan);
 
+    uint digit_scan = 0;
     if(tid < num_bins) {
       // Add back into the warp counters.
+      digit_scan = result.scan[0];
       @meta for(int i = 0; i < num_warps; ++i)
         shared.hist32[i][tid] = result.scan[i];
     } 
@@ -343,13 +339,14 @@ struct cta_radix_rank_t<nt, num_bits, radix_rank_ballot> {
     std::array<uint, vt> scatter;
     @meta for(int i = 0; i < vt; ++i) {{
       uint lower_mask = gl_SubgroupLtMask.x & matches[i];
-      scatter[i] = shared.hist32[warp][x[i]] + bitCount(lower_mask);
-      if(!lower_mask)
-        shared.hist32[warp][x[i]] = scatter[i] + bitCount(matches[i]);
+      uint offset = shared.hist32[warp][x[i]]; 
+      scatter[i] = offset + bitCount(lower_mask);
+      if(0 == (gl_SubgroupLtMask & matches[i]))
+        shared.hist32[warp][x[i]] = offset + bitCount(matches[i]);
     }}
     __syncthreads();
-
-    return { scatter, result.reduction };
+    
+    return { scatter, digit_scan };
   }
 };
 
