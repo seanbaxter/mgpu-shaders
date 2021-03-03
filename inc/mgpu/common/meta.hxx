@@ -123,4 +123,11 @@ type_t* advance_pointer(void*& p, size_t count) {
   return p2;
 }
 
+#ifdef ALIASED_SMEM
+  #define ALIAS_UNION union
+  #pragma spirv GL_EXT_shared_memory_block
+#else
+  #define ALIAS_UNION struct
+#endif
+
 END_MGPU_NAMESPACE

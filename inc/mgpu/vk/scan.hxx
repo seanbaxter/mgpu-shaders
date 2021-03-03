@@ -25,7 +25,7 @@ void scan(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
     launch<nt>(1, cmd_buffer, [=](int tid, int cta) {
       typedef cta_scan_t<nt, type_t> scan_t;
       
-      __shared__ union {
+      __shared__ ALIAS_UNION {
         typename scan_t::storage_t scan;
         type_t values[nv];
       } shared;
@@ -65,7 +65,7 @@ void scan(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {
       typedef cta_reduce_t<nt, type_t> reduce_t;
 
-      __shared__ union {
+      __shared__ ALIAS_UNION {
         typename reduce_t::storage_t reduce;
         type_t values[nv];
       } shared;
@@ -90,7 +90,7 @@ void scan(void* aux_data, size_t& aux_size, cmd_buffer_t& cmd_buffer,
     launch<nt>(num_ctas, cmd_buffer, [=](int tid, int cta) {
       typedef cta_scan_t<nt, type_t> scan_t;
 
-      __shared__ union {
+      __shared__ ALIAS_UNION {
         typename scan_t::storage_t scan;
         type_t values[nv];
       } shared;

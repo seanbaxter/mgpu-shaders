@@ -1,8 +1,6 @@
 #pragma once
 #include "cta_merge.hxx"
 
-#pragma spirv GL_EXT_shared_memory_block
-
 BEGIN_MGPU_NAMESPACE
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +27,7 @@ void kernel_merge(
   int tid = threadIdx.x;
   int cta = blockIdx.x;
  
-  __shared__ union {
+  __shared__ ALIAS_UNION {
     key_t keys[nv + 1];
     int indices[nv];
   } shared;

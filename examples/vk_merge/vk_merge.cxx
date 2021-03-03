@@ -1,3 +1,5 @@
+#define ALIASED_SMEM
+
 #include <mgpu/vk/merge.hxx>
 #include <cstdio>
 

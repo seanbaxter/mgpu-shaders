@@ -1,4 +1,4 @@
-#pragma spirv GL_EXT_shared_memory_block
+#define ALIASED_SMEM
 
 #include "mgpu/vk/radix.hxx"
 #include <cstdio>

@@ -90,11 +90,10 @@ void kernel_mergesort_pass(
   int tid = threadIdx.x;
   int cta = blockIdx.x;
 
-  struct shared_t {
+  __shared__ ALIAS_UNION {
     key_t keys[nv + 1];
     int indices[nv];
-  };
-  __shared__ shared_t shared; 
+  } shared;
 
   range_t tile = get_tile(cta, nv, count);
 
